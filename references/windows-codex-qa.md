@@ -13,6 +13,7 @@ These are *synthetic* fixtures; `actor=user` / `confirmed=True` in tests emulate
 Prerequisites: Windows 10/11, Python 3.10+ on PATH, cloned `v0.2` branch, ordinary local folder with write permission; optional installed Codex Desktop/CLI if the user wants manual navigation.
 
 ~~~powershell
+$env:PYTHONUTF8 = '1' # avoids legacy Windows console code-page errors for Chinese research metadata
 git clone --branch v0.2 https://github.com/dykuang/research-navigator.git
 cd research-navigator
 python --version
@@ -66,3 +67,8 @@ Expected: operator sees before/after/impact, types the required exact `APPROVE P
 Local terminal confirmation is not cryptographic authentication. Scientific evidence is not validated merely by writing a metadata link. The old archive tombstone remains and negative experimental data remain visible, even after creating a new hypothetical candidate. A pending proposal is not a scientific-state write. Native GitHub Milestones (repository planning) are different from scientific `Milestone` research entities.
 
 The release gate should not be marked universally complete until any required real Windows/Codex manual checks have supplied their evidence; record CI coverage separately from site-dependent checks.
+
+
+### Windows Unicode console note
+
+The first native Windows CI run exposed the default Windows code-page failure when a Python subprocess printed Chinese metadata (`UnicodeEncodeError: 'charmap' codec`). The Windows CI job now explicitly sets `PYTHONUTF8=1` and `PYTHONIOENCODING=utf-8`; Windows PowerShell users should set `$env:PYTHONUTF8 = '1'` before launching the CLI or smoke suite. This is a real observed compatibility issue, not a theoretical limitation. The follow-up CI result must be checked before claiming it fixed.
