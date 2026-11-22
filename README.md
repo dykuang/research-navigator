@@ -1,10 +1,20 @@
-# Research Navigator v0.1
+# Research Navigator v0.2 development branch (v0.1 stable on main)
 
 科研项目的交互式规划 + 可追溯状态 + 原生离线 HTML 工作台。面向五个互相联动的模块：选题、文献与基线、实验、路线调整、总结。核心能力是 `active / parked / quarantined / retired / under-revival-review` 的受控研究记忆，以及明确定义的证据/人审/结果状态。
 
 ## 安装
 
 将整个 `research-navigator/` 文件夹解压到你的 Agent Skill 目录（例如 Codex 的 skills 目录）中，或在支持本地 Skill 的 Agent 中登记此目录。Skill 应读取根目录的 `SKILL.md`；不同 Agent 的安装路径和发现机制可能不同，本 ZIP 不会自动安装到你的账号/IDE。
+
+## v0.2 已实现的数据与命令能力（Issues #2–#5）
+
+当前开发分支在旧功能上新增了显式 schema 迁移/备份/恢复、版本冲突检查、ResearchBranch、科学验收型 Milestone、Claim–Evidence 关联，以及轻量 SessionRef（不读取聊天正文）。**无限画布和本地 UI 写回仍在开发计划中**，现有 HTML Dashboard 仍为只读。
+
+- 升级已存在项目：先运行 `python scripts/migrate_state.py preview PROJECT_ROOT`，确认无误后运行 `python scripts/migrate_state.py apply PROJECT_ROOT`；出现事务残留时运行 `python scripts/migrate_state.py recover PROJECT_ROOT`。
+- 创建和管理分支/里程碑、证据链、Agent SessionRef：使用 `python scripts/v02_project.py --help`，参考 [v0.2 操作示例](references/v02-operations.md) 和 [schema 契约](references/state-schema.md)。
+- Agent/CLI 的人类授权要求未改变。 `--actor` 只记录声明，不是身份认证；URL 符合 HTTPS 不代表已验证 Codex 可跳转。
+
+开发质量门槛：`python -m unittest discover -s evals -p 'test_*.py' -v`，GitHub Actions 在 Python 3.10/3.12 上运行相同套件。历史 v0.1 项目保留原始记录，不会静默迁移。
 
 ## 30 秒起步
 
