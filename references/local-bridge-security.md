@@ -42,7 +42,7 @@ The terminal CLI requires an interactive TTY and the exact string `APPROVE PROPO
 
 ### Deliberately excluded
 
-The browser cannot propose lifecycle transitions, review/epistemic promotions, resurrection from archive, completion or retirement, and cannot self-approve. These require the primary Agent/CLI workflow and genuine human authorization. The `--actor`/`confirmed=True` fields alone are not authentication; a malicious local filesystem writer remains outside this safeguard's threat model.
+The browser cannot propose lifecycle transitions, review/epistemic promotions, resurrection from archive, completion or retirement, and cannot self-approve. Browser relations are limited to depends-on, member-of, contributes-to, tests and implements; revives, derived-from, supports, contradicts, blocks and supersedes must use their controlled research workflows. Archived records cannot be modified through proposal status updates. Scientific Result/Claim/Milestone outcomes require dedicated evidence workflows. These require the primary Agent/CLI workflow and genuine human authorization. The `--actor`/`confirmed=True` fields alone are not authentication; a malicious local filesystem writer remains outside this safeguard's threat model.
 
 ### Threat model and operational limitations
 
