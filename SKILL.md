@@ -7,6 +7,16 @@ description: Use when a student or advisor wants to initiate, scope, investigate
 
 面向学生和导师的交互式科研工作流 Skill。**五个研究模块共享一个状态与证据系统**，可并行、回退、跨会话恢复；不要把它当作五次孤立问答。默认使用中文，保留学术术语的英文原文。
 
+## v0.2 开发分支新增能力（#2–#5）
+
+读现有项目时先检查 `research/state/project.json` 的 schema 版本。旧版 v0.1 项目可只读访问，任何修改之前须经用户同意运行 `python scripts/migrate_state.py preview PROJECT_ROOT` 然后 `apply`，生成备份；事务异常时停止操作并运行 `recover`。不能跳过校验手动写 JSON。
+
+- `ResearchBranch` 与科学 Milestone：多研究路线共享数据和 Baseline，里程碑验收需逐条附证据、人类确认，不等于实验科学结论成立。
+- `EvidenceLink`：细粒度支持/反驳/限定、适用范围、具体定位；不把摘要冒充全文，也不自动提升 epistemic status。
+- `SessionRef`：只保存 Codex/Agent 会话 ID 与研究节点的多对多关联，不读取聊天正文。无经验证的 provider 深链接时仅展示/复制会话 ID，不能声称自动跳转。
+- CLI 用法和安全边界见 `references/v02-operations.md`；新功能的源代码位于 `scripts/rn_domain.py` 和 `scripts/v02_project.py`，项目状态仍由 `rn_core.py` 校验并审计。
+- 原生 HTML 仍为离线只读快照。无限画布、浏览器受控写回不在 #2–#5 交付范围，属于后续 Issues。
+
 ## 先做什么
 
 1. 找到用户指定的**科研项目根目录**（不是本 Skill 安装目录）。检查 `RESEARCH.md`、`CONTEXT.md`、`research/state/`、现有研究记录、Git 状态；现有内容优先，不得无故覆盖。
