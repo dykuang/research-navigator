@@ -64,7 +64,7 @@ button:disabled{opacity:.5;cursor:default}
 <label for="viewName">布局名称</label><input id="viewName" value="default" maxlength="80">
 <div class="row"><button id="saveLayout">保存布局</button><button id="loadLayout">恢复布局</button></div>
 <div class="row"><button id="exportLayout">导出 JSON</button><button id="importLayout">导入 JSON</button></div>
-<div class="row"><button id="resetLayout">重新布局</button><button id="exportSVG">导出 SVG</button></div>
+<div class="row"><button id="resetLayout">重新布局</button><button id="exportSVG">导出 SVG</button></div><div class="row"><button id="pinGroup">固定所选模块组</button></div>
 <input id="fileInput" type="file" accept=".json,application/json">
 <p class="info">布局只包含节点位置、视口、分组折叠信息；不包含科研状态或审批结果。离线保存于本浏览器，并可导出为 JSON 供本机 CLI 同步。</p>
 </div><div><div class="warn info">画布是研究状态的只读投影。拖动节点不会更改实验结论；论文证据、搁置/恢复和研究决策仍由状态引擎与人工审批管理。</div></div></aside>
@@ -91,7 +91,7 @@ const TYPES={
   routes:new Set(["ResearchBranch","Milestone","ResearchQuestion","Idea","Hypothesis","Experiment","Result","Baseline","Task"]),
   outputs:new Set(["Milestone","Claim","Artifact","Result","Decision","Source","EvidenceLink"])
 };
-const state={positions:{},camera:{x:210,y:180,z:1},selected:null,hidden:new Set(),drag:null,visible:new Set(),view:"all"};
+const state={positions:{},camera:{x:210,y:180,z:1},selected:null,hidden:new Set(),pinnedGroups:new Set(),drag:null,visible:new Set(),view:"all"};
 const snapshotKey="rn-canvas:"+graph.project_id+":views";
 const safeText=s=>String(s==null?"":s);
 function clamp(v,a,b){return Math.min(b,Math.max(a,v))}
@@ -118,6 +118,7 @@ function validLayout(input){
   if(![c.x,c.y,c.z].every(Number.isFinite)||c.z<0.12||c.z>4.5||Math.abs(c.x)>1e7||Math.abs(c.y)>1e7)throw Error("视口数据非法");
   result.camera={x:c.x,y:c.y,z:c.z};
   if(Array.isArray(input.collapsed))result.collapsed=input.collapsed.filter(id=>byId.has(id));
+  result.pinnedGroups=Array.isArray(input.pinned_groups)?input.pinned_groups.filter(x=>typeof x==="string"&&x.length<=120):[];
   return result;
 }
 function applyLayout(input){
@@ -125,13 +126,14 @@ function applyLayout(input){
   state.positions={...defaults,...checked.positions};
   state.camera=checked.camera;
   state.hidden=new Set(checked.collapsed);
+  state.pinnedGroups=new Set(checked.pinnedGroups);
   render();
 }
 function currentLayout(name){
   return {schema_version:"canvas-layout-v1",project_id:graph.project_id,
     graph_revision:graph.project_revision,view_name:name||"default",
     author:"local-browser",saved_at:new Date().toISOString(),
-    positions:state.positions,viewport:state.camera,collapsed:[...state.hidden].sort()};
+    positions:state.positions,viewport:state.camera,collapsed:[...state.hidden].sort(),pinned_groups:[...state.pinnedGroups].sort()};
 }
 function readSaved(){
   try{return JSON.parse(localStorage.getItem(snapshotKey)||"{}")}catch{return {}}
@@ -394,7 +396,8 @@ $("collapse").onclick=()=>{
 $("saveLayout").onclick=saveLayout;$("loadLayout").onclick=loadLayout;
 $("exportLayout").onclick=exportLayout;$("importLayout").onclick=()=>$("fileInput").click();
 $("fileInput").onchange=ev=>importLayout(ev.target.files[0]);
-$("resetLayout").onclick=()=>{state.positions=defaultPositions();state.hidden.clear();fitAll();notice("已重置布局（尚未保存）")};
+$("resetLayout").onclick=()=>{const defaults=defaultPositions();for(const node of graph.nodes){if(state.pinnedGroups.has(node.module||"session")&&state.positions[node.id])defaults[node.id]=state.positions[node.id]}state.positions=defaults;state.hidden.clear();fitAll();notice("已重新布局，固定的模块组位置保留（尚未保存）")};
+$("pinGroup").onclick=()=>{if(!state.selected){notice("先选择所属模块的节点");return}const group=byId.get(state.selected).module||"session";if(state.pinnedGroups.has(group)){state.pinnedGroups.delete(group);notice("已解除模块组固定："+group)}else{state.pinnedGroups.add(group);notice("已固定模块组："+group)} };
 $("exportSVG").onclick=exportSvg;
 viewport.addEventListener("keydown",ev=>{
   if(ev.target!==viewport)return;
