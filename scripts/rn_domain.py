@@ -102,6 +102,8 @@ def accept_milestone(root, milestone_id, approval_note, actor="user"):
         if any(not c["evidence_refs"] for c in item["milestone"]["criteria"]):
             raise ResearchError("each scientific criterion needs linked evidence before acceptance")
         # Evidence IDs may still be uncertain: consent does not strengthen epistemic status.
+        for criterion in item["milestone"]["criteria"]:
+            criterion["reviewed"] = True
         item["milestone"]["accepted"] = True
         item["milestone"]["approval_note"] = approval_note
         item["review_status"] = "user-confirmed"
