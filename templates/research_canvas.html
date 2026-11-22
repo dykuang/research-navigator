@@ -40,6 +40,12 @@ button:disabled{opacity:.5;cursor:default}
 #notice{font-size:11px;line-height:1.5;padding:10px;background:#ecf7f3;border-radius:8px;color:#28655f}
 #counts{margin:10px 0 4px;color:#546b7e;font-size:11px}
 #fileInput{display:none}
+#semanticEditor{border-top:1px solid #dbe4ed;padding-top:12px}
+#semanticEditor textarea{width:100%;min-height:105px;resize:vertical;border:1px solid #c5d6e4;border-radius:8px;font:12px/1.5 ui-monospace,Consolas,monospace;padding:7px}
+#semanticEditor button{min-width:94px}
+#semanticEditor pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;background:#f1f5fa;padding:9px;border-radius:7px}
+#semanticEditor .attention{color:#8e3b2e;font-weight:650}
+#semanticEditor .ok{color:#176b58;font-weight:650}
 @media(max-width:1050px){#app{grid-template-columns:205px minmax(0,1fr)}#inspector{position:absolute;right:0;top:54px;width:260px;bottom:0;z-index:8;box-shadow:-8px 0 20px #1e34471a}#workspace{grid-column:2} }
 @media(max-width:680px){#app{grid-template-columns:1fr;grid-template-rows:54px 180px minmax(0,1fr)}aside{grid-column:1;padding:9px;display:flex;gap:9px;overflow:auto}aside>div{min-width:170px}aside h2{display:none}#workspace{grid-column:1}#inspector{display:none}#toolbar{top:6px;left:6px}#hint{display:none}}
 </style></head>
@@ -67,22 +73,47 @@ button:disabled{opacity:.5;cursor:default}
 <div class="row"><button id="resetLayout">重新布局</button><button id="exportSVG">导出 SVG</button></div><div class="row"><button id="pinGroup">固定所选模块组</button></div>
 <input id="fileInput" type="file" accept=".json,application/json">
 <p class="info">布局只包含节点位置、视口、分组折叠信息；不包含科研状态或审批结果。离线保存于本浏览器，并可导出为 JSON 供本机 CLI 同步。</p>
-</div><div><div class="warn info">画布是研究状态的只读投影。拖动节点不会更改实验结论；论文证据、搁置/恢复和研究决策仍由状态引擎与人工审批管理。</div></div></aside>
+</div><div><div class="warn info">离线画布只保存视图布局。连接本机 #6 Bridge 后可以提交科研变更提案，但不能从浏览器直接批准、恢复档案或确认科学真值。</div></div></aside>
 <section id="workspace" aria-label="无限研究画布，可按住空白处拖拽、滚轮缩放、使用键盘导航" tabindex="0">
 <div id="world"><svg id="edges" aria-hidden="true"></svg><div id="nodes"></div></div>
 <div id="toolbar"><button id="zoomIn" aria-label="放大">＋</button><button id="zoomOut" aria-label="缩小">－</button><button id="fit" class="primary">适应画布</button><button id="focus">定位节点</button><button id="unselect">取消选择</button><button id="collapse" title="折叠/展开节点邻居">折叠邻居</button></div>
 <svg id="minimap" viewBox="0 0 175 125" role="img" aria-label="节点概览迷你地图"></svg>
 <div id="hint">拖动空白处平移 · 滚轮缩放 · 拖动卡片仅改变布局 · 聚焦卡片后按方向键移动 · Enter 查看详情</div>
 </section>
-<aside id="inspector" aria-live="polite"><div><h2>节点详情</h2><div id="details" class="info">请选择画布中的研究节点。关联证据、实验状态与分支信息在此展示。</div></div><div><h3>视图与数据说明</h3><div id="notice">等待载入</div></div></aside>
+<aside id="inspector" aria-live="polite"><div><h2>节点详情</h2><div id="details" class="info">请选择画布中的研究节点。关联证据、实验状态与分支信息在此展示。</div></div>
+<div id="semanticEditor">
+<h2>科研语义提案</h2>
+<p id="editMode" class="info">离线只读：可以导出提案 JSON，正式修改需要本机提案服务。</p>
+<label for="semanticOperation">操作类型</label>
+<select id="semanticOperation">
+<option value="add-item">创建 Idea / Hypothesis / Task</option>
+<option value="add-branch">创建 ResearchBranch</option>
+<option value="add-milestone">创建科研 Milestone</option>
+<option value="add-relation">建立研究关系</option>
+<option value="unlink-relation">撤销研究关系</option>
+<option value="revise-criterion">修改里程碑条件</option>
+<option value="attach-milestone-evidence">给里程碑关联证据</option>
+<option value="link-evidence">Claim–Evidence 证据链</option>
+<option value="set-status">非关键流程状态</option>
+</select>
+<label for="semanticParams">操作参数（可编辑 JSON）</label>
+<textarea id="semanticParams" spellcheck="false" aria-label="语义提案参数 JSON"></textarea>
+<div class="row"><button id="useSelected">使用选中节点</button></div>
+<label for="semanticReason">变更理由（必填）</label>
+<input id="semanticReason" value="Review the proposed research direction before execution" maxlength="1000">
+<div class="row"><button id="previewSemantic" class="primary">模拟影响（不写入）</button><button id="queueSemantic" disabled>提交待审批</button></div>
+<div class="row"><button id="exportSemantic">导出草案 JSON</button><button id="refreshSemantic">刷新状态</button></div>
+<p id="semanticState" class="info" role="status">未提交科研变更</p>
+<pre id="semanticDiff" aria-live="polite">请先预览变更，查看影响范围。</pre>
+</div><div><h3>视图与数据说明</h3><div id="notice">等待载入</div></div></aside>
 </div>
-<script>
+<script nonce="__CANVAS_NONCE__">
 "use strict";
 (function(){
-const graph=JSON.parse(document.getElementById("rn-graph").textContent);
+let graph=JSON.parse(document.getElementById("rn-graph").textContent);
 const initialViews=JSON.parse(document.getElementById("rn-views").textContent);
-const byId=new Map(graph.nodes.map(n=>[n.id,n]));
-const allEdges=graph.edges;
+let byId=new Map(graph.nodes.map(n=>[n.id,n]));
+let allEdges=graph.edges;
 const $=id=>document.getElementById(id);
 const viewport=$("workspace"),world=$("world"),svg=$("edges"),cards=$("nodes"),minimap=$("minimap");
 const NS="http://www.w3.org/2000/svg", WIDTH=190, HEIGHT=94;
@@ -92,7 +123,7 @@ const TYPES={
   outputs:new Set(["Milestone","Claim","Artifact","Result","Decision","Source","EvidenceLink"])
 };
 const state={positions:{},camera:{x:210,y:180,z:1},selected:null,hidden:new Set(),pinnedGroups:new Set(),drag:null,visible:new Set(),view:"all"};
-const snapshotKey="rn-canvas:"+graph.project_id+":views";
+let snapshotKey="rn-canvas:"+graph.project_id+":views";
 const safeText=s=>String(s==null?"":s);
 function clamp(v,a,b){return Math.min(b,Math.max(a,v))}
 function defaultPositions(){
@@ -322,6 +353,154 @@ function renderMini(){
     state.camera.y=r.height/2-y*state.camera.z;render();
   };
 }
+const liveToken=decodeURIComponent(location.hash.replace(/^#token=/,""));
+if(liveToken&&location.protocol==="http:"){
+  history.replaceState(null,"",location.pathname);
+}
+let liveReady=false,previewed=null,pendingProposal=null;
+function semanticPayload(){
+  return {operation:$("semanticOperation").value,
+    params:JSON.parse($("semanticParams").value),
+    reason:$("semanticReason").value,
+    expected_revision:graph.project_revision};
+}
+function exampleParams(op){
+  const selected=state.selected?byId.get(state.selected):null;
+  const id=selected?selected.entity_id:"IDEA-0001";
+  const examples={
+    "add-item":{type:"Idea",title:"New research candidate",module:"topic",description:"Initial unverified hypothesis"},
+    "add-branch":{title:"Research route A",goal:"Evaluate a reproducible research alternative",
+                  stop_conditions:["No repeatable improvement under fair baseline"],module:"topic"},
+    "add-milestone":{title:"Validate experimental feasibility",
+                     criteria:["Baseline is reproducible","Result artifacts are documented"],
+                     module:"experiment"},
+    "add-relation":{source:id,target:"BR-0001",relation:"member-of"},
+    "unlink-relation":{source:id,target:"BR-0001",relation:"member-of"},
+    "revise-criterion":{milestone_id:id,criterion_id:"C-001",
+                        text:"Revised scientific acceptance condition"},
+    "attach-milestone-evidence":{milestone_id:id,criterion_id:"C-001",
+                                 evidence_id:"RES-0001"},
+    "link-evidence":{claim_id:id,evidence_id:"SRC-0001",stance:"qualifies",
+                     quality:"unverified",scope:"Limited to the cited research conditions",
+                     locator:"Abstract",note:"Source must be independently verified"},
+    "set-status":{item_id:id,field:"workflow_status",value:"in-progress"}
+  };
+  return examples[op];
+}
+function updateEditorExample(){
+  $("semanticParams").value=JSON.stringify(exampleParams($("semanticOperation").value),null,2);
+  invalidatePreview();
+}
+function invalidatePreview(){
+  previewed=null;$("queueSemantic").disabled=true;
+  $("semanticState").textContent="未通过预览，尚无任何科研写入";
+}
+function showOffline(){
+  liveReady=false;$("editMode").textContent="离线只读；可导出草案 JSON。启动 local_editor.py serve 后通过 Bridge 打开画布才能提交提案。";
+  $("previewSemantic").disabled=true;$("queueSemantic").disabled=true;
+  $("refreshSemantic").disabled=true;
+}
+async function bridge(path,method="GET",data){
+  if(!liveToken)throw Error("当前不处于安全本机编辑会话");
+  const opts={method,cache:"no-store",headers:{"X-RN-Token":liveToken}};
+  if(data!==undefined){opts.headers["Content-Type"]="application/json";opts.body=JSON.stringify(data)}
+  const response=await fetch(path,opts);
+  const body=await response.json();
+  if(!response.ok)throw Error(body.error||"Bridge HTTP "+response.status);
+  return body;
+}
+async function connectLive(){
+  try{
+    const fresh=await bridge("/api/graph");
+    if(!fresh||!fresh.project_id)throw Error("missing project graph");
+    const changedProject=graph.project_id&&graph.project_id!==fresh.project_id;
+    if(changedProject)throw Error("Project ID changed unexpectedly");
+    graph=fresh;byId=new Map(graph.nodes.map(n=>[n.id,n]));allEdges=graph.edges;
+    snapshotKey="rn-canvas:"+graph.project_id+":views";
+    liveReady=true;
+    chooseStartup();
+    $("editMode").textContent="本机受控提案模式 · 状态修订 "+graph.project_revision+
+      " · 审批必须回到本机交互终端";
+    $("previewSemantic").disabled=false;$("refreshSemantic").disabled=false;
+    $("projectName").textContent="项目 "+graph.project_id.slice(0,8)+
+      " · 实时修订 "+graph.project_revision+" · "+graph.nodes.length+" 节点";
+    $("semanticState").textContent="已连接受控本机 Bridge；尚无科研状态变更";
+    notice("本机只读图已同步。浏览器只可提交待审批提案。");
+  }catch(e){showOffline();$("semanticState").textContent="无法连接 Bridge："+e.message;}
+}
+function initializeFreshGraph(fresh){
+  if(fresh.project_id!==graph.project_id)throw Error("项目身份不匹配");
+  const previousRevision=graph.project_revision;
+  graph=fresh;byId=new Map(graph.nodes.map(n=>[n.id,n]));allEdges=graph.edges;
+  state.positions={...defaultPositions(),...Object.fromEntries(Object.entries(state.positions).filter(([id])=>byId.has(id)))};
+  state.hidden=new Set([...state.hidden].filter(id=>byId.has(id)));
+  if(state.selected&&!byId.has(state.selected))state.selected=null;
+  $("projectName").textContent="项目 "+graph.project_id.slice(0,8)+
+    " · 修订 "+graph.project_revision+" · "+graph.nodes.length+" 节点";
+  $("editMode").textContent="本机受控提案模式 · 状态修订 "+graph.project_revision+
+    " · 终端人工确认，不自动认可任何研究真值";
+  if(graph.project_revision!==previousRevision)invalidatePreview();
+  render();
+}
+async function refreshLive(){
+  if(!liveReady)return;
+  try{
+    const fresh=await bridge("/api/graph");
+    initializeFreshGraph(fresh);
+    if(pendingProposal){
+      const row=await bridge("/api/proposals/"+pendingProposal);
+      $("semanticState").textContent="提案 "+pendingProposal+" 状态："+row.status+
+        " · 当前科研修订 "+row.current_revision;
+      if(row.status!=="pending")pendingProposal=null;
+    }else{
+      $("semanticState").textContent="科研图已刷新至修订 "+graph.project_revision;
+    }
+  }catch(e){$("semanticState").textContent="刷新失败："+e.message}
+}
+async function previewSemantic(){
+  try{
+    if(!liveReady)throw Error("离线模式只能导出草案");
+    const payload=semanticPayload();
+    const report=await bridge("/api/preview","POST",payload);
+    $("semanticDiff").textContent=JSON.stringify(report,null,2);
+    previewed=JSON.stringify(payload);
+    $("queueSemantic").disabled=false;
+    $("semanticState").textContent="已完成模拟预览（未保存、未批准）";
+  }catch(e){invalidatePreview();$("semanticDiff").textContent="预览拒绝："+e.message}
+}
+async function queueSemantic(){
+  try{
+    if(!liveReady||!previewed)throw Error("请先预览");
+    const payload=semanticPayload();
+    if(JSON.stringify(payload)!==previewed)throw Error("参数或修订已改变，请重新预览");
+    const result=await bridge("/api/proposals","POST",payload);
+    pendingProposal=result.proposal_id;
+    $("semanticState").textContent="待终端审批："+pendingProposal+"（科研状态尚未更改）";
+    $("semanticDiff").textContent+="\n\n提案已入队，必须在本机终端运行：\n"+
+      "python scripts/local_editor.py inspect PROJECT_ROOT "+pendingProposal+
+      "\npython scripts/local_editor.py approve PROJECT_ROOT "+pendingProposal;
+    invalidatePreview();
+    $("semanticState").textContent="待终端审批："+pendingProposal+"（科研状态尚未更改）";
+  }catch(e){invalidatePreview();$("semanticState").textContent="提案提交失败："+e.message}
+}
+function initSemantic(){
+  $("semanticOperation").onchange=updateEditorExample;
+  $("useSelected").onclick=updateEditorExample;
+  $("semanticParams").addEventListener("input",invalidatePreview);
+  $("semanticReason").addEventListener("input",invalidatePreview);
+  $("previewSemantic").onclick=previewSemantic;
+  $("queueSemantic").onclick=queueSemantic;
+  $("refreshSemantic").onclick=refreshLive;
+  $("exportSemantic").onclick=()=>{
+    try{
+      const payload=semanticPayload();
+      exportText("research-proposal-draft.json",JSON.stringify(payload,null,2),"application/json");
+      $("semanticState").textContent="草案已导出；未进入审批队列，未更改科研状态";
+    }catch(e){$("semanticState").textContent="导出失败："+e.message}
+  };
+  updateEditorExample();
+}
+
 function exportText(name,data,type){
   const blob=new Blob([data],{type}),url=URL.createObjectURL(blob);
   const a=document.createElement("a");a.href=url;a.download=name;a.click();
@@ -418,8 +597,10 @@ viewport.addEventListener("keydown",ev=>{
   const o=document.createElement("option");o.value=mod;o.textContent=mod;$("module").appendChild(o);
 });
 $("projectName").textContent="项目 "+graph.project_id.slice(0,8)+" · 修订 "+graph.project_revision+" · "+graph.nodes.length+" 节点";
-notice("离线只读 · 科研节点状态来自修订 "+graph.project_revision+" · 自由拖拽只更改布局");
-chooseStartup();
+notice("科研布局与状态分离 · 移动节点不修改权威研究记录");
+initSemantic();
+if(liveToken){connectLive()}else{chooseStartup();showOffline()}
+
 })();
 </script>
 </body></html>
