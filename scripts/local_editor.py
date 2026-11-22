@@ -15,7 +15,12 @@ import sys
 from urllib.parse import urlsplit
 
 from rn_core import ResearchError, load, validate_state
-from rn_proposals import queue_proposal, inspect_proposal, approve_proposal
+from rn_proposals import (queue_proposal, inspect_proposal, approve_proposal,
+                          preview_proposal, proposal_status)
+from graph_projection import project_graph
+from build_canvas import embedded_json
+from pathlib import Path
+import re
 
 PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -34,6 +39,8 @@ revive, validate claims, or save research changes directly. Approval requires
 a separate interactive terminal command.</p>
 <p id="status">Checking local connection…</p>
 <button id="refresh">Refresh status</button>
+<p><a id="canvasLink" href="#">Open interactive Research Canvas</a> — full canvas proposals,
+preview and human approval workflow (no direct browser research writes)</p>
 <fieldset><legend>Create a draft proposal</legend>
 <label>Operation <select id="operation">
 <option value="add-item">Create research item</option>
@@ -53,6 +60,7 @@ const token=decodeURIComponent(location.hash.replace(/^#token=/,""));
 history.replaceState(null,"",location.pathname);
 let revision=null;
 const output=document.getElementById("output");
+document.getElementById("canvasLink").href="/canvas#token="+encodeURIComponent(token);
 function show(value){output.textContent=typeof value==="string"?value:JSON.stringify(value,null,2);}
 async function request(path,method="GET",payload=null){
   if(!token) throw Error("No access token; reopen the URL printed in your terminal.");
@@ -172,6 +180,45 @@ def create_handler(root, token, port):
             return True
 
         def do_GET(self):
+            if self.path == "/canvas":
+                # Public shell contains NO project data. Only authenticated
+                # X-RN-Token /api/graph requests return project information.
+                if self.headers.get("Host") != allowed_host:
+                    return self._send(403, {"error":"Invalid Host"})
+                if self.headers.get("Sec-Fetch-Site","same-origin") not in ("same-origin","none"):
+                    return self._send(403, {"error":"Cross-site request forbidden"})
+                template = Path(__file__).resolve().parent.parent/"templates"/"research_canvas.html"
+                nonce = secrets.token_urlsafe(18)
+                empty_graph = {"project_id":"","project_revision":0,"nodes":[],"edges":[]}
+                empty_views = {"schema_version":"canvas-views-v1","project_id":"","views":{}}
+                page = (template.read_text(encoding="utf-8")
+                        .replace("__RN_GRAPH_JSON__",embedded_json(empty_graph))
+                        .replace("__RN_VIEWS_JSON__",embedded_json(empty_views))
+                        .replace("__CANVAS_NONCE__",nonce))
+                raw = page.encode("utf-8")
+                self._headers(200,content_type="text/html",nonce=nonce)
+                self.wfile.write(raw)
+                return
+            if self.path == "/api/graph":
+                if not self._guard():
+                    return
+                try:
+                    # Canonical source of truth, not cached static snapshot.
+                    self._send(200,project_graph(load(root),limit=None))
+                except (ResearchError, ValueError, OSError) as e:
+                    self._send(409, {"error":str(e)})
+                return
+            if self.path.startswith("/api/proposals/"):
+                if not self._guard():
+                    return
+                pid = self.path[len("/api/proposals/"):]
+                if not re.fullmatch(r"[0-9a-f]{32}",pid):
+                    return self._send(404,{"error":"Not found"})
+                try:
+                    self._send(200,proposal_status(root,pid))
+                except (ResearchError,OSError) as e:
+                    self._send(404,{"error":str(e)})
+                return
             if self.path == "/":
                 if self.headers.get("Host") != allowed_host:
                     return self._send(403, {"error":"Invalid Host"})
@@ -191,7 +238,7 @@ def create_handler(root, token, port):
             self._send(404,{"error":"Not found"})
 
         def do_POST(self):
-            if self.path != "/api/proposals":
+            if self.path not in ("/api/proposals","/api/preview"):
                 return self._send(404,{"error":"No HTTP approval endpoint"})
             if not self._guard(mutation=True):
                 return
@@ -206,6 +253,8 @@ def create_handler(root, token, port):
             try:
                 raw = self.rfile.read(length)
                 data = json.loads(raw)
+                if self.path == "/api/preview":
+                    return self._send(200,preview_proposal(root,data))
                 result = queue_proposal(root,data)
                 return self._send(202,result)
             except (UnicodeDecodeError,json.JSONDecodeError):
