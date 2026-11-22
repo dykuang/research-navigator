@@ -95,6 +95,10 @@ button:disabled{opacity:.5;cursor:default}
 <option value="attach-milestone-evidence">给里程碑关联证据</option>
 <option value="link-evidence">Claim–Evidence 证据链</option>
 <option value="set-status">非关键流程状态</option>
+<option value="archive-route">正式搁置/隔离/终止路线</option>
+<option value="begin-revival-review">启动正式回收复审（第一批准）</option>
+<option value="approve-revival-candidate">创建派生候选（第二批准）</option>
+<option value="reject-revival-review">拒绝回收复审</option>
 </select>
 <label for="semanticParams">操作参数（可编辑 JSON）</label>
 <textarea id="semanticParams" spellcheck="false" aria-label="语义提案参数 JSON"></textarea>
@@ -260,6 +264,14 @@ function selectNode(id){
   section(node.type+" · "+node.entity_id,node.label);
   section("状态（来自权威研究记录）",JSON.stringify(node.statuses||{},null,2));
   section("研究与证据信息",JSON.stringify(node.metadata||{},null,2));
+  if(node.metadata&&node.metadata.decision_history)
+    section("历史决策与归档背景（仅参考）",JSON.stringify(node.metadata.decision_history,null,2));
+  if(node.metadata&&node.metadata.archive)
+    section("失败范围 / 不确定性 / 回收触发条件",JSON.stringify(node.metadata.archive,null,2));
+  if(node.metadata&&node.metadata.revival)
+    section("正式复审状态（非执行授权）",JSON.stringify(node.metadata.revival,null,2));
+  if(node.type==="ResearchBranch"||node.type==="Milestone")
+    section("规划资格",node.actionable?"当前允许规划，仍需核验证据":"当前不得自动纳入正向规划或标记科学验证");
   section("相关关系",related.length?related.map(e=>e.from+" —"+e.type+"→ "+e.to+
     " ("+e.provenance.collection+")").join("\n"):"暂无");
   const stamp=document.createElement("div");stamp.className="info";
@@ -388,7 +400,16 @@ function exampleParams(op){
     "link-evidence":{claim_id:id,evidence_id:"SRC-0001",stance:"qualifies",
                      quality:"unverified",scope:"Limited to the cited research conditions",
                      locator:"Abstract",note:"Source must be independently verified"},
-    "set-status":{item_id:id,field:"workflow_status",value:"in-progress"}
+    "set-status":{item_id:id,field:"workflow_status",value:"in-progress"},
+    "archive-route":{item_id:id,lifecycle:"parked",failure_category:"evaluation",
+      failure_scope:"Only a weak negative synthetic evaluation",revival_triggers:"New reproducible observations",
+      confidence:"uncertain",lesson:"Do not generalize a single negative result"},
+    "begin-revival-review":{item_id:id,question:"Which old assumption changed?",
+      new_conditions:"New data or evaluation constraints"},
+    "approve-revival-candidate":{item_id:id,title:"Derived hypothesis to test",
+      new_conditions:"New independent experiment or dataset",
+      approval_note:"Second separate approval after reviewing old failures"},
+    "reject-revival-review":{item_id:id,decision_note:"No sufficiently changed conditions"}
   };
   return examples[op];
 }
