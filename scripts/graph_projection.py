@@ -143,7 +143,10 @@ def _nodes_edges(state):
                          "workspace_id": session.get("workspace_id", ""),
                          "session_id": session.get("session_id", ""),
                          "url": session.get("url", ""),
-                         "recorded_by": session.get("recorded_by", "")},
+                         "recorded_by": session.get("recorded_by", ""),
+                         "recorded_at": session.get("recorded_at", ""),
+                         "entity_ids": session.get("entity_ids", []),
+                         "roles": session.get("roles", {})},
             "actionable": False,
         })
 
