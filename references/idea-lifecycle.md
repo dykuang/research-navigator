@@ -32,3 +32,15 @@ If they explicitly ask for a formal review:
 6. If review is rejected, return to the previous archived lifecycle with reason; keep review result in an event or research note.
 
 **Security limit**: CLI `--actor user|mentor` is not proof of identity. The calling Agent must actually present the choice and receive authorization. A fully local unattended script cannot substitute for this policy.
+
+## #11 Canvas lifecycle approvals (v0.2)
+
+The connected localhost Canvas offers explicit **archive-route**, **begin-revival-review** (first approval), **approve-revival-candidate** (second independent approval) and **reject-revival-review** proposals. These do not bypass the terminal approval gate: each phase is a separate proposal, with a unique project revision and explicit typed terminal confirmation. A mere click on an archived node never mutates its state.
+
+`archive-route` requires a documented failure scope, reason and future revival triggers, plus optionally evidence IDs, diagnostic confidence, category and lesson. It stores an immutable historical tombstone and flags affected downstream routes/Milestones for review. Negative experiments are **not automatically** generalized to broad scientific failure. Shared Baselines and unrelated branches remain active.
+
+A formal review only marks the original `under-revival-review`. The second explicit approved proposal creates a **new** hypothesis-level candidate with `derived-from` and `revives` edges and returns the original to its archived state. Its old ID, negative experiment results, archive tombstone and historical events are preserved. Rejecting a review returns the original to its previous archived status without creating a candidate.
+
+Archive cards are visible in the Canvas inspector with their scope, uncertainty, revival conditions, original evidence and bounded decision events. Planning mode excludes inactive nodes; archive/risk/synthesis exploration remains read-only. The local operator's typed approval is a workflow gate, **not cryptographic identification** of a mentor.
+
+Use `python scripts/local_editor.py serve PROJECT_ROOT` and then the connected Canvas. The standalone offline HTML remains a read-only snapshot with exportable draft proposals.
