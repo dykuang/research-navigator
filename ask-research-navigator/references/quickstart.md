@@ -27,3 +27,14 @@
 - 是否实际写盘取决于 Agent 是否获得项目根目录和用户授权。
 - 默认不会“通过对话自动验证”论文、实验效果或学术创新性；要留下可追踪的来源和复核步骤。
 - 已搁置的方法不会默认回到正向规划，但历史负结果仍会用于风险检查。
+
+## v0.2 画布快捷步骤（合成演示项目）
+
+~~~powershell
+$env:PYTHONUTF8='1'
+python evals/make_demo.py C:\\Temp\\rn-synthetic
+python scripts/build_dashboard.py C:\\Temp\\rn-synthetic
+# 打开 C:\\Temp\\rn-synthetic\\research\\canvas\\index.html
+~~~
+
+这是**合成研究数据**，不代表真实学术论文或实验验证。离线画布只能移动和导出布局/提案草稿；如需受控科研变更，运行 `python scripts/local_editor.py serve PROJECT_ROOT` 并在交互终端逐条审查批准。Codex SessionRef 目前只支持会话 ID 关联、筛选和复制，不承诺自动打开会话。
