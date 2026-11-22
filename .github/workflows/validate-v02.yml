@@ -56,6 +56,9 @@ jobs:
   windows:
     name: Windows native Python and offline canvas smoke
     runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
