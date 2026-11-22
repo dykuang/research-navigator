@@ -56,3 +56,7 @@ description: Use when a student, advisor, or first-time user explicitly asks how
 > 答：能登记论文与证据等级、标记待验证内容，但当前 v0.1.x 不自带联网学术检索及论文真实性自动核验；需由有权限的 Agent 联网查证或由用户提供可信材料。
 
 **完成条件**：用户知道当前问题的答案、适合的入口和下一句如何提问；若要求执行，则已明确切换到主 Skill 的实际流程，而不是只停留在帮助问答。
+
+## v0.2 使用指引（仅解释/路由，默认不写数据）
+
+当用户询问无限画布，说明 `python scripts/build_dashboard.py PROJECT_ROOT` 同时生成离线经典 SVG 与可平移缩放的 `research/canvas/index.html`；**离线画布不写科研数据**。需要提出新 Branch/Idea/Milestone 或证据关系时须明确授权后使用本机 `local_editor.py serve`，依次预览、入队、交互终端人工审批和刷新。归档失败路径需记录条件，两阶段回收创建新候选而非覆盖历史。SessionRef 只关联会话 ID，不读取完整聊天；Codex 深链接未验证只能复制 ID。Windows/Codex 安装未在用户 PC 自动执行。详细依据见主 Skill 的 `references/canvas-guide.md`、`references/idea-lifecycle.md`、`references/windows-codex-qa.md`。
