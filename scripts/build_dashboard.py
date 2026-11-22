@@ -14,6 +14,9 @@ def build(root):
     content=template.read_text(encoding="utf-8").replace("__EMBEDDED_STATE_JSON__",data)
     p["dash"].parent.mkdir(parents=True,exist_ok=True)
     p["dash"].write_text(content,encoding="utf-8")
+    # Generate the new offline canvas alongside the unchanged SVG fallback.
+    from build_canvas import build_canvas
+    build_canvas(root)
     cards=[i for i in state["items"] if i["lifecycle_status"] in ("parked","quarantined","retired","under-revival-review")]
     if cards:
         arc=p["root"]/"research"/"archive"; folder=arc/"cards";folder.mkdir(parents=True,exist_ok=True)
