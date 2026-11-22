@@ -7,7 +7,11 @@ The optional service uses Python standard library and binds only to `127.0.0.1` 
 |---|---|---|
 | `/` | GET | Standalone local proposal form; no research mutations |
 | `/api/state` | GET | Token-protected and Host-checked minimal read-only projection |
-| `/api/proposals` | POST | Token, exact Host, Origin and Fetch-Site checks; enqueue draft only |
+| `/api/proposals` | POST | Token, exact Host, Origin and Fetch-Site checks; simulate and enqueue validated draft only |
+| `/api/preview` | POST | Token-protected before/after/impact simulation, no writes |
+| `/api/graph` | GET | Token-protected canonical typed graph projection |
+| `/api/proposals/PROPOSAL_ID` | GET | Token-protected read-only pending/applied/rejected status |
+| `/canvas` | GET | Project-data-free canvas shell; graph fetched only after token authorization |
 | Any approval URL | Any | Not implemented (404/405) |
 
 The printed URL includes a random bearer capability in the URL fragment; the fragment is removed from the address bar by JavaScript and is never sent in the HTTP request URL. JS uses the X-RN-Token header. CSP nonces, X-Frame-Options, no-store caching, JSON-only POST, tight body size, strict origin/host checks, and no CORS guard against ordinary cross-site attacks. Capability exposure to another local process remains possible; this is NOT enterprise identity authentication.
@@ -64,3 +68,21 @@ python -m unittest discover -s evals -p 'test_*.py' -v
 ~~~
 
 Security regression covers Host/Origin/token rejection, absence of HTTP approval, stale revisions, invalid typed relations, proposal-only operation, CLI TTY enforcement and audit event exactly-once behavior.
+
+## #10: Live Canvas semantic proposals
+
+When the localhost bridge is running, open the printed capability URL and click **Open interactive Research Canvas**. You can also open the same origin's `/canvas#token=...` URL using the private launch token. The canvas shell contains no project details for unauthenticated requests. Only `/api/graph` with a valid `X-RN-Token` returns research node/edge data. Do not expose a bridge session over a public proxy or share its token.
+
+The right-hand **科研语义提案** panel offers typed operations and editable JSON parameters: new Idea/Hypothesis/Task, ResearchBranch with goal and stop conditions, scientific Milestone with acceptance criteria, typed relation add/unlink, criterion revision, milestone evidence attachment, and Claim–Evidence provenance. Choose a node and click **使用选中节点** to populate IDs. For expensive experiments, the created Task is only a candidate; the bridge does not execute experiments.
+
+1. Click **模拟影响（不写入）**. The bridge validates the exact current project revision and runs the same canonical rules on a private in-memory copy; returns proposed before/after changes and affected nodes.
+2. Click **提交待审批**. The proposal goes to a separate queue only after passing simulation. A successful HTTP 202 means *pending*, not applied.
+3. Inspect the ID and verify the full parameters and rationale in an interactive local terminal: `python scripts/local_editor.py inspect PROJECT_ROOT PROPOSAL_ID`.
+4. Approve by `python scripts/local_editor.py approve PROJECT_ROOT PROPOSAL_ID`, typing the full confirmation phrase; or reject instead.
+5. Back in the canvas, click **刷新状态**. A successfully approved edit appears in the live canonical graph at its new project revision; stale, rejected and pending proposals are distinct states.
+
+No HTTP endpoint can approve a proposal. The terminal is the explicit human approval gate; `confirmed=True` and `actor=user` are internal assertions and are **not** real person authentication. Browser JSON parameter editing is an intentionally transparent advanced interface; future UX improvements can replace it with dedicated forms without modifying the safety contract.
+
+**Preserved restrictions:** archived entities cannot be linked into active planning, moved to `active`, or edited through this bridge; `revives`, `derived-from`, `supersedes`, `supports`, `blocks` and `contradicts` relations are not general canvas-edit operations. Evidence links are separately typed and scoped; attaching evidence never validates a claim automatically. Accepted Milestones cannot have criteria silently changed. Any invalid semantic proposal is rejected before entering the queue; stale approvals are rejected with no canonical writes. The normal offline `research/canvas/index.html` remains view-only and offers JSON draft export, not fake approval buttons.
+
+**Testing:** `evals/test_canvas_semantics.py` exercises shared Baseline, Milestone, criterion, evidence provenance, unlinking and stale proposals. `evals/browser_check_canvas_semantic.py` exercises actual protected localhost Chromium preview → queue → terminal-mediated simulated approval → refresh and blocked archive changes; its programmatic `confirmed=True` emulates the terminal approval **only within an isolated test fixture**, not human verification in production.
