@@ -66,6 +66,12 @@ description: Use when a student or advisor wants to initiate, scope, investigate
 
 `scripts/local_editor.py serve PROJECT_ROOT` 可在本机启动只接受 `127.0.0.1` 请求的受限提案服务；浏览器只允许**排队待审批提案**，不能直接写科研状态、确认/回收科研方向或假装完成科学验证。用户必须在**交互终端**执行 `inspect` 后逐条 `approve` 或 `reject`，服务端再次校验项目 revision 和全部状态约束，成功时写入事件记录。若服务未运行，原离线 HTML 仍为只读。安全边界和命令见 `references/local-bridge-security.md`。
 
+## v0.2 交互式无限画布与布局（#7–#9）
+
+`scripts/graph_projection.py` 从权威科研状态只读生成稳定节点/带来源关系。运行 `scripts/build_dashboard.py PROJECT_ROOT` 会生成两种离线只读工作台：原有 `research/dashboard/index.html`（经典 SVG 回退）和 `research/canvas/index.html`（无限可视画布）。画布可拖动节点、缩放、筛选、展开分支与检查详细证据，**所有交互均不自动更改任何研究真值或项目状态**。
+
+布局用独立 `research/canvas/views.json` 管理，保存/导入导出方式见 `references/canvas-guide.md` 和 `scripts/canvas_views.py`。文件只含坐标、缩放、折叠、视图名称/作者/修订，不允许存储审批或科学验证结果。用户要进行语义编辑时仍使用现有 CLI 或 #6 本机受控提案流程；未来浏览器的正式接入归 #10。
+
 ## 常用命令与工具
 
 所有 CLI 都使用 Python 标准库，无网络要求。详细 CLI 例子见 `references/cli-recipes.md`。
