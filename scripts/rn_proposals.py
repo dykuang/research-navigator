@@ -14,8 +14,10 @@ import secrets
 from rn_core import (ResearchError, add_item, add_relation, change_status, load,
                      now, paths, read_json, workspace_lock)
 
-PROPOSAL_OPERATIONS = ("add-item", "add-relation", "set-status")
-SAFE_RELATIONS = ("depends-on", "member-of", "contributes-to", "tests", "implements")
+from rn_canvas_semantics import (CANVAS_OPERATIONS, SAFE_RELATIONS, validate_extra,
+                                 apply_to_state, preview_from_state)
+
+PROPOSAL_OPERATIONS = CANVAS_OPERATIONS
 PUBLIC_ITEM_TYPES = ("Idea", "Hypothesis", "Task", "ResearchQuestion", "Claim", "Risk",
                      "Concept", "ExperimentPath", "Experiment", "Decision")
 MAX_FIELDS = 14
@@ -87,6 +89,8 @@ def validate_proposal(root, payload):
             "to-be-determined", "ready-for-agent", "to-be-implemented", "in-progress"
         ):
             raise ResearchError("blocking, completion and retirement require main Agent workflow")
+    else:
+        validate_extra(op, args)
     return {"operation": op, "params": args, "reason": reason.strip(), "expected_revision": rev}
 
 
@@ -99,6 +103,9 @@ def queue_proposal(root, payload):
             raise ResearchError("project must migrate to v0.2 before edits")
         if state["project"]["revision"] != proposal["expected_revision"]:
             raise ResearchError("stale proposal; refresh state and retry")
+        # Reject structurally invalid or unauthorized semantic changes before
+        # placing the proposal in the queue; no canonical files are modified.
+        preview_from_state(state, proposal)
         pid = secrets.token_hex(16)
         proposal.update({"id": pid, "created_at": now(),
                          "project_id": state["project"]["project_id"],
@@ -159,67 +166,16 @@ def approve_proposal(root, proposal_id, *, confirmed=False):
         live = read_json(path)
         if live.get("status") != "pending":
             raise ResearchError("proposal already processed")
-        # Delegating to rn_core's public mutators would reacquire the workspace
-        # lock, potentially deadlocking. Apply to a copy and commit once below.
+        # Simulate the exact approved change on a private copy; the canonical
+        # write occurs exactly once and preserves the event-based audit trail.
         import copy
-        from rn_core import (new_item, item_by_id, RELATIONS, require, propagate,
-                             write, WORKFLOW, OUTCOME)
+        from rn_core import write
         state = copy.deepcopy(state)
-        args = clean["params"]
-        op = clean["operation"]
-        events = []
-        if op == "add-item":
-            row = new_item(state, args["type"], args["title"], args["module"],
-                           description=args.get("description", ""),
-                           next_action=args.get("next_action", ""), actor="user")
-            events.append({"action":"item-created","actor":"user",
-                           "item_id":row["id"],"reason":clean["reason"],
-                           "proposal_id":proposal_id,"after":copy.deepcopy(row)})
-            result = {"id": row["id"]}
-        elif op == "add-relation":
-            a,b,t = args["source"],args["target"],args["relation"]
-            require(t, RELATIONS, "relation")
-            item_by_id(state,a);item_by_id(state,b)
-            row = {"from":a,"to":b,"type":t}
-            if a == b or row in state["relations"]:
-                raise ResearchError("self or duplicate relation")
-            if t == "member-of" and item_by_id(state,b)["type"] != "ResearchBranch":
-                raise ResearchError("member-of target must be ResearchBranch")
-            if t == "contributes-to" and item_by_id(state,b)["type"] != "Milestone":
-                raise ResearchError("contributes-to target must be Milestone")
-            state["relations"].append(row)
-            if t == "depends-on":
-                item_by_id(state,a)["depends_on"].append(b)
-            events.append({"action":"relation-added","actor":"user","item_id":a,
-                           "reason":clean["reason"],"proposal_id":proposal_id,"after":row})
-            if t in ("blocks","contradicts"):
-                target = item_by_id(state,b)
-                target["impact_status"] = "blocked" if t == "blocks" else "needs-review"
-                target["revision"] += 1;target["updated_at"] = now()
-                events.extend(propagate(state,b,"user",clean["reason"],block=t=="blocks"))
-            result = row
-        else:
-            ident, field, value = args["item_id"], args["field"], args["value"]
-            require(value,WORKFLOW if field=="workflow_status" else OUTCOME, field)
-            row = item_by_id(state, ident)
-            if row["lifecycle_status"] != "active":
-                raise ResearchError("archived/revival-review items must use the primary lifecycle workflow")
-            if field == "outcome" and row["type"] in ("Result", "Claim", "Milestone"):
-                raise ResearchError("scientific result/claim outcomes require documented evidence workflow")
-            prior = row[field]
-            if prior == value:
-                raise ResearchError("no-op status update is not recorded")
-            row[field] = value;row["revision"] += 1;row["updated_at"] = now()
-            if field == "outcome":
-                events.extend(propagate(state,ident,"user",clean["reason"]))
-            events.insert(0,{"action":"status-changed","actor":"user","item_id":ident,
-                             "proposal_id":proposal_id,"reason":clean["reason"],
-                             "before":{field:prior},"after":{field:value}})
-            result = {"id":ident,"field":field,"value":value}
+        result, events = apply_to_state(state, clean, proposal_id=proposal_id)
         # Validation and revision checks occur in canonical write().
         write(root,state,events,expected_revision=p["expected_revision"])
-        # A crash between write and proposal acknowledgement can be recognized
-        # by event proposal_id on next approval attempt (do not double-apply).
+        # A crash between write and acknowledgement is detected via revision
+        # and event proposal_id; it cannot be silently applied a second time.
         live["status"] = "applied"
         live["applied_at"] = now()
         live["result"] = result
@@ -227,6 +183,28 @@ def approve_proposal(root, proposal_id, *, confirmed=False):
         atomic_json(path, live)
         return {"status":"applied","result":result,
                 "revision":state["project"]["revision"]}
+
+
+
+def preview_proposal(root, payload):
+    """Preview a concrete before/after/impact; never enqueue or edit state."""
+    clean = validate_proposal(root, payload)
+    state = load(root)
+    if state["project"].get("schema_version") != "0.2.0":
+        raise ResearchError("migrate project before semantic proposals")
+    return preview_from_state(state, clean)
+
+
+def proposal_status(root, proposal_id):
+    """Minimal status result for the authenticated local browser."""
+    row = inspect_proposal(root, proposal_id)
+    current = load(root)["project"]
+    if row.get("project_id") != current["project_id"]:
+        raise ResearchError("wrong project")
+    return {"proposal_id":proposal_id, "status":row["status"],
+            "expected_revision":row["expected_revision"],
+            "current_revision":current["revision"],
+            "result":row.get("result")}
 
 
 def reject_proposal(root, proposal_id, *, confirmed=False):
