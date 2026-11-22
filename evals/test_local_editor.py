@@ -93,6 +93,40 @@ class ProposalSecurityTests(unittest.TestCase):
                     queue_proposal(self.root,payload)
         self.assertEqual(len(load(self.root)["items"]),0)
 
+    def test_revival_relation_cannot_be_queued(self):
+        idea=add_item(self.root,kind="Idea",title="Old idea",module="topic")
+        for relation in ("revives","derived-from","supersedes","blocks","contradicts","supports"):
+            with self.subTest(relation=relation):
+                p=self.proposal(op="add-relation",params={"source":idea["id"],
+                                  "target":idea["id"],"relation":relation})
+                with self.assertRaises(ResearchError):
+                    queue_proposal(self.root,p)
+
+    def test_archived_outcome_cannot_be_modified_by_bridge(self):
+        from rn_core import change_status
+        idea=add_item(self.root,kind="Idea",title="Archived synthetic idea",module="topic")
+        change_status(self.root,idea["id"],"lifecycle_status","parked",
+                      "Human parked synthetic idea",actor="user",
+                      failure_scope="Small synthetic test",revival_triggers="New sample")
+        original=load(self.root)
+        p=self.proposal(op="set-status",params={"item_id":idea["id"],
+                          "field":"outcome","value":"positive"})
+        ref=queue_proposal(self.root,p)["proposal_id"]
+        with self.assertRaisesRegex(ResearchError,"archived"):
+            approve_proposal(self.root,ref,confirmed=True)
+        self.assertEqual(load(self.root),original)
+
+    def test_scientific_result_outcome_requires_primary_workflow(self):
+        result=add_item(self.root,kind="Result",title="Synthetic result",
+                        module="experiment",observation="Toy observation",
+                        artifact_path="synthetic-result.log")
+        before=load(self.root)
+        ref=queue_proposal(self.root,self.proposal(op="set-status",
+            params={"item_id":result["id"],"field":"outcome","value":"positive"}))["proposal_id"]
+        with self.assertRaisesRegex(ResearchError,"scientific result"):
+            approve_proposal(self.root,ref,confirmed=True)
+        self.assertEqual(load(self.root),before)
+
     def test_valid_status_and_relation_gated_by_terminal(self):
         idea=add_item(self.root,kind="Idea",title="Existing idea",module="topic")
         before=load(self.root)
