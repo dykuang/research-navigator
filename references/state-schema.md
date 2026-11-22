@@ -6,7 +6,7 @@
 
 `items.json = {"items":[...]}`. Each item has: `id`, `type`, `title`, `module`, `description`, `workflow_status`, `epistemic_status`, `review_status`, `outcome`, `lifecycle_status`, `impact_status`, `owner`, `created_by`, `evidence_refs`, `depends_on`, `acceptance_criteria`, `next_action`, `observation`, `artifact_path`, `completion_note`, `revision`, `created_at`, `updated_at`, `archive`, `revival`, `derived_from`.
 
-ID prefixes vary with type (`IDEA-0001`, `HYP-0001`, `EXP-0001`, etc.). `depends_on` mirrors the `depends-on` relation edges and is validated for consistency. Relations are exact stable-ID edges `{from, to, type}`. Types: `depends-on`, `supports`, `contradicts`, `tests`, `implements`, `supersedes`, `derived-from`, `revives`, `blocks`. Dependency cycles and dangling edges are rejected.
+ID prefixes vary with type (`IDEA-0001`, `HYP-0001`, `EXP-0001`, etc.). `depends_on` mirrors the `depends-on` relation edges and is validated for consistency. Relations are exact stable-ID edges `{from, to, type}`. Types: `depends-on`, `supports`, `contradicts`, `tests`, `implements`, `supersedes`, `derived-from`, `revives`, `blocks`, `member-of`, `contributes-to`. Dependency cycles and dangling edges are rejected.
 
 Status dimensions are **orthogonal**. Workflow: `to-be-determined`, `ready-for-agent`, `to-be-implemented`, `in-progress`, `blocked`, `done`, `no-further-considered`. Epistemic: `uncertain`, `hypothesis`, `source-backed`, `experimentally-supported`, `contradicted`, `not-applicable`. Review: `needs-user-confirmation`, `user-confirmed`, `not-required`, `rejected`. Outcome: `unknown`, `positive`, `mixed`, `negative`, `inconclusive`. Lifecycle: `active`, `parked`, `quarantined`, `retired`, `under-revival-review`. Impact: `current`, `needs-review`, `stale`, `blocked`.
 
@@ -45,3 +45,11 @@ New entities in the existing `items.json`:
 CLI: `scripts/v02_project.py` for research Branch, Milestone, EvidenceLink and SessionRef actions. Existing `scripts/update_project.py` remains in place. Canvas (#7 onward) and secure localhost writeback (#6) are **not** implemented by these domain-model changes; static dashboard remains read-only. See `references/v02-operations.md` for documented commands and safe usage.
 
 **Backups and recovery:** after `preview`, run `apply`; retain generated ZIP and project Git history. If reads report a pending transaction, stop all other tools and run `recover` with the project root. Do not delete journal manually or run edits concurrently from several machines.
+
+## #11/#12 lifecycle and SessionRef overlay
+
+The Canvas stores a proposal queue in `research/canvas/proposals/` (not canonical scientific data). `archive-route` writes an explicit archive tombstone with failure scope, confidence and revival triggers only after terminal approval. `begin-revival-review` and `approve-revival-candidate` are independent approved transactions and revisions; a new hypothesis-level ID links back via `derived-from` and `revives`; the old record and negative Result remain archived. Shared Baseline is never auto-archived due to failure in a dependent branch.
+
+SessionRef records hold provider/workspace/session IDs, optional *unverified* clean HTTPS metadata URL, explicit entity IDs/roles, recording actor/time. Browser `register-session`, `link-session` and `unlink-session` are pending proposals until terminal approval. No provider session URL is marked verified by the v0.2 adapter, so SessionRef inspector provides manual ID copy rather than guessed auto-navigation.
+
+Layout `research/canvas/views.json` contains project ID, node positions, viewport, collapsed node IDs, pinned groups and view metadata only; no scientific status fields. For Windows UTF-8 output use `PYTHONUTF8=1`. The GitHub native Milestone for issue planning is not the research `Milestone` entity inside `items.json`.
