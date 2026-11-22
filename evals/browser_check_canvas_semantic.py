@@ -9,7 +9,7 @@ import sys
 import tempfile
 import threading
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
 from rn_core import init_project, add_item, load, change_status
@@ -63,7 +63,7 @@ def main():
                 }))
                 page.locator("#semanticReason").fill("Human review of novel research direction")
                 page.locator("#previewSemantic").click()
-                page.wait_for_function('document.querySelector("#queueSemantic").disabled===false')
+                expect(page.locator("#queueSemantic")).to_be_enabled(timeout=5000)
                 preview=json.loads(page.locator("#semanticDiff").inner_text())
                 assert preview["accepted"] is False
                 assert preview["scientifically_validated"] is False
@@ -71,7 +71,7 @@ def main():
                 assert load(root)==initial, "Preview mutated canonical research state"
 
                 page.locator("#queueSemantic").click()
-                page.wait_for_function('document.querySelector("#semanticState").textContent.includes("待终端审批")')
+                expect(page.locator("#semanticState")).to_contain_text("待终端审批",timeout=5000)
                 assert load(root)==initial, "Queued proposal mutated research state"
                 status=page.locator("#semanticState").inner_text()
                 import re
@@ -90,7 +90,7 @@ def main():
                     "source":archived["id"],"target":"BR-0001","relation":"member-of"
                 }))
                 page.locator("#previewSemantic").click()
-                page.wait_for_function('document.querySelector("#semanticDiff").textContent.includes("预览拒绝")')
+                expect(page.locator("#semanticDiff")).to_contain_text("预览拒绝",timeout=5000)
                 assert page.locator("#queueSemantic").is_disabled()
                 assert "archived" in page.locator("#semanticDiff").inner_text()
 
