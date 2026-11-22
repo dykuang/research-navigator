@@ -95,3 +95,19 @@ The terminal displays a fresh change preview and requires the exact `APPROVE PRO
 Archived branches are not eligible for direct modification, revival links or positive planning. Accepted Milestone conditions require a new formal review; evidence metadata does not validate a scientific claim, and an Agent cannot authenticate a mentor by choosing an actor label. Browser proposals cannot launch experiments or create expensive tasks without a subsequent separate execution decision.
 
 See [local Bridge security](local-bridge-security.md) for the detailed permission and threat model.
+
+## #12 — SessionRef inspector and navigation support matrix
+
+From the connected or offline Research Canvas, select an Idea / Claim / ResearchBranch or a SessionRef card. The inspector displays matching external sessions, their provider, workspace ID, explicit role (`idea-origin`, `experiment-analysis`, `decision`, `park`, `revival`), recording actor/time, and a **copy Session ID** action. Use the Provider and Workspace filters; one session can link to several research entities and a single entity can have several sessions.
+
+From the **connected** localhost Canvas, use the semantic proposal panel to `register-session`, `link-session`, or `unlink-session`. The action is **not effective until separately approved in an interactive local terminal**. Without the Bridge, export the JSON draft instead. The graph contains only references, not full chat messages, transcripts, private conversation titles, credentials or automatic imports.
+
+| Provider / client | Store SessionRef IDs | Copy ID and workspace | Automatic verified session deeplink |
+|---|---|---|---|
+| Codex local / Windows | Yes, supplied real ID | Yes | **Not verified in v0.2**; manual navigation only |
+| ChatGPT | Yes, supplied real ID | Yes | **Not verified in v0.2**; manual navigation only |
+| Other Agent | Yes, supplied real ID | Yes | **Not verified in v0.2**; manual navigation only |
+
+A user-provided HTTPS URL is metadata; it is **not provider-verified**. No adapter currently sets `url_verified=true`. Therefore the inspector never invents URLs or renders an enabled Open button for unverified sessions. A missing/deleted/permission-denied external session remains a historical reference and degrades to manual ID copy. If a provider adapter is implemented in a future release, it must validate session authority before user-click navigation and warn about other projects. A workspace ID is a scope label, not proof of login or provider ownership.
+
+Check external sharing/privacy rules before publishing Canvas HTML snapshots, which contain research graph metadata. No SessionRef registration, unlinking, or navigation operation upgrades scientific truth.
