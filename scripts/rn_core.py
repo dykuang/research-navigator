@@ -13,22 +13,22 @@ import uuid
 
 SCHEMA_VERSION = "0.1.0"
 MODULES = ("topic", "literature", "experiment", "pivot", "synthesis")
-TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "Concept", "Source", "PriorWork", "Baseline", "DatasetOrMaterial", "Experiment", "ExperimentPath", "Result", "Claim", "Decision", "Task", "Risk", "Artifact")
-PREFIXES = {"ResearchQuestion":"RQ", "Idea":"IDEA", "Method":"METH", "Hypothesis":"HYP", "Concept":"CON", "Source":"SRC", "PriorWork":"WORK", "Baseline":"BASE", "DatasetOrMaterial":"DATA", "Experiment":"EXP", "ExperimentPath":"PATH", "Result":"RES", "Claim":"CLAIM", "Decision":"DEC", "Task":"TASK", "Risk":"RISK", "Artifact":"ART"}
+TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "Concept", "Source", "PriorWork", "Baseline", "DatasetOrMaterial", "Experiment", "ExperimentPath", "Result", "Claim", "Decision", "Task", "Risk", "Artifact", "ResearchBranch", "Milestone")
+PREFIXES = {"ResearchQuestion":"RQ", "Idea":"IDEA", "Method":"METH", "Hypothesis":"HYP", "Concept":"CON", "Source":"SRC", "PriorWork":"WORK", "Baseline":"BASE", "DatasetOrMaterial":"DATA", "Experiment":"EXP", "ExperimentPath":"PATH", "Result":"RES", "Claim":"CLAIM", "Decision":"DEC", "Task":"TASK", "Risk":"RISK", "Artifact":"ART", "ResearchBranch":"BR", "Milestone":"MILE"}
 WORKFLOW = ("to-be-determined", "ready-for-agent", "to-be-implemented", "in-progress", "blocked", "done", "no-further-considered")
 EPISTEMIC = ("uncertain", "hypothesis", "source-backed", "experimentally-supported", "contradicted", "not-applicable")
 REVIEW = ("needs-user-confirmation", "user-confirmed", "not-required", "rejected")
 OUTCOME = ("unknown", "positive", "mixed", "negative", "inconclusive")
 LIFECYCLE = ("active", "parked", "quarantined", "retired", "under-revival-review")
 IMPACT = ("current", "needs-review", "stale", "blocked")
-RELATIONS = ("depends-on", "supports", "contradicts", "tests", "implements", "supersedes", "derived-from", "revives", "blocks")
+RELATIONS = ("depends-on", "supports", "contradicts", "tests", "implements", "supersedes", "derived-from", "revives", "blocks", "member-of", "contributes-to")
 ARCHIVED = ("parked", "quarantined", "retired")
 ACTORS = ("agent", "user", "mentor", "tool")
 ACCESS = ("full-text", "abstract", "secondary", "user-provided", "unavailable")
 VERIFICATIONS = ("unverified", "metadata-checked", "primary-inspected")
 FAILURE = ("theory", "method", "implementation", "data", "evaluation", "resources", "unknown")
-CRITICAL_TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "PriorWork", "Baseline", "Experiment", "Claim", "Result")
-CANDIDATE_TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "Baseline", "ExperimentPath", "Task")
+CRITICAL_TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "PriorWork", "Baseline", "Experiment", "Claim", "Result", "ResearchBranch", "Milestone")
+CANDIDATE_TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "Baseline", "ExperimentPath", "Task", "ResearchBranch")
 
 class ResearchError(ValueError):
     pass
@@ -39,7 +39,7 @@ def now():
 def paths(root):
     root = Path(root).expanduser().resolve()
     st = root / "research" / "state"
-    return {"root":root, "state":st, "project":st/"project.json", "items":st/"items.json", "relations":st/"relations.json", "sources":st/"sources.json", "events":st/"events.jsonl", "lock":st/".research-navigator.lock", "dash":root/"research"/"dashboard"/"index.html"}
+    return {"root":root, "state":st, "project":st/"project.json", "items":st/"items.json", "relations":st/"relations.json", "sources":st/"sources.json", "events":st/"events.jsonl", "session_refs":st/"session_refs.json", "evidence_links":st/"evidence_links.json", "lock":st/".research-navigator.lock", "dash":root/"research"/"dashboard"/"index.html"}
 
 def read_json(p):
     with Path(p).open(encoding="utf-8") as f:
@@ -93,6 +93,8 @@ def init_project(root, name, question=""):
         atomic_json(p["items"],{"items":[]})
         atomic_json(p["relations"],{"relations":[]})
         atomic_json(p["sources"],{"sources":[]})
+        atomic_json(p["session_refs"],{"session_refs":[]})
+        atomic_json(p["evidence_links"],{"evidence_links":[]})
         p["events"].touch(exist_ok=False)
         append_events(p, [{"action":"project-initialized", "actor":"user", "reason":"explicit initialization", "after":{"name":name, "research_question":question}}])
         intro = p["root"]/"RESEARCH.md"
@@ -104,7 +106,7 @@ def load(root):
     p = paths(root)
     if not p["project"].exists():
         raise ResearchError("未初始化项目；先执行 init")
-    return {"project":read_json(p["project"]), "items":read_json(p["items"])["items"], "relations":read_json(p["relations"])["relations"], "sources":read_json(p["sources"])["sources"], "events":read_events(p["events"])}
+    return {"project":read_json(p["project"]), "items":read_json(p["items"])["items"], "relations":read_json(p["relations"])["relations"], "sources":read_json(p["sources"])["sources"], "session_refs":read_json(p["session_refs"])["session_refs"] if p["session_refs"].exists() else [], "evidence_links":read_json(p["evidence_links"])["evidence_links"] if p["evidence_links"].exists() else [], "events":read_events(p["events"])}
 
 def read_events(path):
     if not path.exists(): return []
@@ -128,6 +130,8 @@ def write(root, state, events):
     atomic_json(p["items"],{"items":state["items"]})
     atomic_json(p["relations"],{"relations":state["relations"]})
     atomic_json(p["sources"],{"sources":state["sources"]})
+    atomic_json(p["session_refs"],{"session_refs":state.get("session_refs",[])})
+    atomic_json(p["evidence_links"],{"evidence_links":state.get("evidence_links",[])})
     atomic_json(p["project"],state["project"])
     append_events(p, events)
 
@@ -206,6 +210,10 @@ def add_relation(root, source, target, relation, actor="agent", reason=""):
         row={"from":source,"to":target,"type":relation}
         if row in s["relations"]: raise ResearchError("关系已存在")
         s["relations"].append(row)
+        if relation=="member-of" and item_by_id(s,target)["type"]!="ResearchBranch":
+            raise ResearchError("member-of must target ResearchBranch")
+        if relation=="contributes-to" and item_by_id(s,target)["type"]!="Milestone":
+            raise ResearchError("contributes-to must target Milestone")
         if relation=="depends-on": item_by_id(s,source)["depends_on"].append(target)
         events=[{"action":"relation-added","actor":actor,"item_id":source,"reason":reason or "explicit relation","after":row}]
         if relation in ("contradicts","blocks"):
@@ -224,7 +232,7 @@ def dependents(state, ident):
     for r in state["relations"]:
         a,b,t=r["from"],r["to"],r["type"]
         if t=="depends-on" and b==ident:out.add(a)
-        elif t in ("supports","tests","implements") and a==ident:out.add(b)
+        elif t in ("supports","tests","implements","contributes-to","member-of") and a==ident:out.add(b)
         elif t=="supersedes" and b==ident:out.add(a)
     return out
 
@@ -264,7 +272,7 @@ def change_status(root, ident, field, value, reason, actor="agent", evidence_ref
             if not obj["acceptance_criteria"] or not completion_note:raise ResearchError("done 需要验收标准及完成情况/工件说明")
             obj["completion_note"]=completion_note
         if field=="lifecycle_status":
-            if obj["type"] not in ("ResearchQuestion","Idea","Method","Hypothesis","ExperimentPath","Baseline","Experiment"):
+            if obj["type"] not in ("ResearchQuestion","Idea","Method","Hypothesis","ExperimentPath","Baseline","Experiment","ResearchBranch"):
                 raise ResearchError("该实体类型不能按研究路线归档")
             if old=="active" and value=="under-revival-review": raise ResearchError("活跃想法无需回收审查")
             if old in ARCHIVED and value=="active":raise ResearchError("禁止从归档状态直接恢复 active；先复审并创建新版本")
@@ -395,6 +403,9 @@ def validate_state(s,strict=False):
         if src.get("verification_status") not in VERIFICATIONS:errors.append(f"{src.get('id')}: invalid source verification")
         if src.get("access_level")=="abstract" and src.get("verification_status")=="primary-inspected":errors.append(f"{src.get('id')}: abstract masquerading as full text")
         if src.get("verification_status")!="unverified" and not src.get("verification_note"):errors.append(f"{src.get('id')}: verified without verification note")
+    # v0.2 domain validators inspect additive, optional sidecars.
+    from rn_v02 import validate_v02
+    errors.extend(validate_v02(s))
     if strict and errors:raise ResearchError("状态校验失败:\n- "+"\n- ".join(errors))
     return errors
 
