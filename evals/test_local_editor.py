@@ -252,6 +252,42 @@ class HttpBridgeSecurityTests(ProposalSecurityTests):
         self.assertEqual(code,415)
         self.assertEqual(load(self.root)["project"]["revision"],0)
 
+    def test_http_graph_and_preview_never_commit(self):
+        initial=load(self.root)
+        graph_code,graph=self.request("/api/graph")
+        self.assertEqual(graph_code,200)
+        self.assertEqual(graph["project_id"],initial["project"]["project_id"])
+        self.assertEqual(graph["project_revision"],initial["project"]["revision"])
+        payload=self.proposal(op="add-branch",params={
+            "title":"Synthetic research branch",
+            "goal":"Compare two reproducible strategies",
+            "stop_conditions":["No reliable improvement"],
+            "module":"topic"})
+        code,preview=self.request("/api/preview","POST",payload)
+        self.assertEqual(code,200)
+        self.assertFalse(preview["accepted"])
+        self.assertTrue(preview["requires_terminal_approval"])
+        self.assertEqual(preview["result"]["type"],"ResearchBranch")
+        self.assertEqual(load(self.root),initial)
+        code,_=self.request("/api/preview","POST",payload,token=False)
+        self.assertEqual(code,403)
+        code,_=self.request("/api/preview","POST",payload,origin="http://evil.example")
+        self.assertEqual(code,403)
+        self.assertEqual(load(self.root),initial)
+
+    def test_http_proposal_status_is_token_gated(self):
+        row=queue_proposal(self.root,self.proposal())
+        endpoint="/api/proposals/"+row["proposal_id"]
+        code,detail=self.request(endpoint)
+        self.assertEqual(code,200)
+        self.assertEqual(detail["status"],"pending")
+        code,_=self.request(endpoint,token=False)
+        self.assertEqual(code,403)
+        approve_proposal(self.root,row["proposal_id"],confirmed=True)
+        code,detail=self.request(endpoint)
+        self.assertEqual(code,200)
+        self.assertEqual(detail["status"],"applied")
+
     def test_http_read_requires_capability(self):
         code,_=self.request("/api/state",token=False)
         self.assertEqual(code,403)
