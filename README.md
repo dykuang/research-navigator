@@ -8,7 +8,7 @@
 
 ## v0.2 已实现的数据与命令能力（Issues #2–#5）
 
-当前开发分支在旧功能上新增了显式 schema 迁移/备份/恢复、版本冲突检查、ResearchBranch、科学验收型 Milestone、Claim–Evidence 关联，以及轻量 SessionRef（不读取聊天正文）。**无限画布和本地 UI 写回仍在开发计划中**，现有 HTML Dashboard 仍为只读。
+当前开发分支在旧功能上新增了显式 schema 迁移/备份/恢复、版本冲突检查、ResearchBranch、科学验收型 Milestone、Claim–Evidence 关联，以及轻量 SessionRef（不读取聊天正文）。**#2–#5 的范围是数据层；后续 #6–#12 已在本开发分支实现受控提案 Bridge、交互画布、研究归档回收与 SessionRef UI。** 独立离线 HTML 仍为只读快照。
 
 - 升级已存在项目：先运行 `python scripts/migrate_state.py preview PROJECT_ROOT`，确认无误后运行 `python scripts/migrate_state.py apply PROJECT_ROOT`；出现事务残留时运行 `python scripts/migrate_state.py recover PROJECT_ROOT`。
 - 创建和管理分支/里程碑、证据链、Agent SessionRef：使用 `python scripts/v02_project.py --help`，参考 [v0.2 操作示例](references/v02-operations.md) 和 [schema 契约](references/state-schema.md)。
@@ -39,6 +39,15 @@
 任何修改都须 **模拟预览（显示变更前后与影响）→ 提交待审批提案 → 本机交互终端逐条审阅并批准/拒绝 → 刷新科研图**。浏览器无直接批准或执行科研实验的能力。修改真实状态的审批命令为 `python scripts/local_editor.py approve PROJECT_ROOT PROPOSAL_ID`，必须在交互终端输入完整确认文本；旧修订版本、非法归档操作和无效证据会被拒绝。
 
 不启动服务时，`research/canvas/index.html` 仍是自包含、离线、只读 HTML，允许**导出提案草案 JSON**而不是虚假的“保存科研结果”。详见 [画布指南](references/canvas-guide.md) 与 [本机写回安全说明](references/local-bridge-security.md)。**终端确认不是身份认证，人工批准也不等于科学验证**。
+
+## v0.2 完整能力与发布边界（#11–#14）
+
+- **#11**：可从连接本机 Bridge 的画布提出 archive/park/quarantine/retire，正式双阶段回收复审，保留旧失败范围与 Result，产生新 `hypothesis` 派生候选（不是直接恢复旧研究路线）。
+- **#12**：SessionRef 多对多关联、Provider/Workspace 筛选、复制真实 Session ID；**真实 Codex 自动深链接尚未验证**，不会凭空构造 URL 或导入聊天正文。
+- **#13**：自动化合成数据回归与原生 Windows CI；真实用户电脑上的 Codex 安装与导航必须按 [Windows/Codex 验收清单](references/windows-codex-qa.md) 手动验证。
+- **#14**：完整发布检查见 [Release checklist](docs/release-v0.2.md) 和 [CHANGELOG](CHANGELOG.md)。GitHub 项目管理 Milestone 与科研实体 `Milestone` 是两回事。
+
+**安全原则**：画布里的科研修改只有经过 preview → pending proposal → 交互终端独立审批 → 刷新后才生效；`actor=user` / `confirmed=True` 不是身份认证；学术证据仍需独立核验。Windows PowerShell 运行含中文科研元数据的 CLI 时推荐先运行 `$env:PYTHONUTF8='1'`。
 
 ## 30 秒起步
 
