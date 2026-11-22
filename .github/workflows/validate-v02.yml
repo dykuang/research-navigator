@@ -52,3 +52,38 @@ jobs:
         run: python evals/browser_check_canvas_semantic.py
       - name: Real browser SessionRef smoke
         run: python evals/browser_check_canvas_sessions.py
+
+  windows:
+    name: Windows native Python and offline canvas smoke
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python and platform
+        shell: pwsh
+        run: |
+          python --version
+          python -c "import sys,platform; print(platform.platform()); assert sys.platform=='win32'"
+      - name: Compile scripts and evaluation suite
+        shell: pwsh
+        run: python -m compileall -q scripts evals
+      - name: Windows regression suite
+        shell: pwsh
+        run: python -m unittest discover -s evals -p "test_*.py" -v
+      - name: Windows native synthetic project and HTML canvas
+        shell: pwsh
+        run: |
+          $project = Join-Path $env:RUNNER_TEMP "rn-v02-synthetic-project"
+          python evals/make_demo.py $project
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/validate_state.py $project
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/build_dashboard.py $project
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $canvas = Join-Path $project "research/canvas/index.html"
+          $classic = Join-Path $project "research/dashboard/index.html"
+          if (!(Test-Path $canvas) -or !(Test-Path $classic)) { throw "Generated HTML not found" }
+          Write-Host "PASS Windows project + Canvas + classic dashboard: $canvas"
