@@ -11,7 +11,8 @@ import re
 import tempfile
 import uuid
 
-SCHEMA_VERSION = "0.1.0"
+SCHEMA_VERSION = "0.2.0"
+LEGACY_SCHEMA_VERSION = "0.1.0"
 MODULES = ("topic", "literature", "experiment", "pivot", "synthesis")
 TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "Concept", "Source", "PriorWork", "Baseline", "DatasetOrMaterial", "Experiment", "ExperimentPath", "Result", "Claim", "Decision", "Task", "Risk", "Artifact", "ResearchBranch", "Milestone")
 PREFIXES = {"ResearchQuestion":"RQ", "Idea":"IDEA", "Method":"METH", "Hypothesis":"HYP", "Concept":"CON", "Source":"SRC", "PriorWork":"WORK", "Baseline":"BASE", "DatasetOrMaterial":"DATA", "Experiment":"EXP", "ExperimentPath":"PATH", "Result":"RES", "Claim":"CLAIM", "Decision":"DEC", "Task":"TASK", "Risk":"RISK", "Artifact":"ART", "ResearchBranch":"BR", "Milestone":"MILE"}
@@ -39,7 +40,7 @@ def now():
 def paths(root):
     root = Path(root).expanduser().resolve()
     st = root / "research" / "state"
-    return {"root":root, "state":st, "project":st/"project.json", "items":st/"items.json", "relations":st/"relations.json", "sources":st/"sources.json", "events":st/"events.jsonl", "session_refs":st/"session_refs.json", "evidence_links":st/"evidence_links.json", "lock":st/".research-navigator.lock", "dash":root/"research"/"dashboard"/"index.html"}
+    return {"root":root, "state":st, "project":st/"project.json", "items":st/"items.json", "relations":st/"relations.json", "sources":st/"sources.json", "events":st/"events.jsonl", "session_refs":st/"session_refs.json", "evidence_links":st/"evidence_links.json", "journal":st/"pending-transaction.json", "lock":st/".research-navigator.lock", "dash":root/"research"/"dashboard"/"index.html"}
 
 def read_json(p):
     with Path(p).open(encoding="utf-8") as f:
@@ -85,7 +86,7 @@ def init_project(root, name, question=""):
     with workspace_lock(root):
         if p["project"].exists():
             raise ResearchError("项目已初始化；请直接 resume，不能重复初始化或覆盖")
-        if any(p[key].exists() for key in ("items", "relations", "sources", "events")):
+        if any(p[key].exists() for key in ("items", "relations", "sources", "session_refs", "evidence_links", "events", "journal")):
             raise ResearchError("检测到部分已有状态文件；为避免覆盖，停止初始化，请先检查/备份")
         stamp = now()
         project = {"schema_version":SCHEMA_VERSION, "project_id":str(uuid.uuid4()), "name":name, "research_question":question, "focus_module":"topic", "next_decision":"明确问题对象、研究目标与资源约束", "revision":0, "created_at":stamp, "updated_at":stamp}
@@ -104,6 +105,8 @@ def init_project(root, name, question=""):
 
 def load(root):
     p = paths(root)
+    if p["journal"].exists():
+        raise ResearchError("存在未完成的状态写入事务；先运行 migrate_state.py recover")
     if not p["project"].exists():
         raise ResearchError("未初始化项目；先执行 init")
     return {"project":read_json(p["project"]), "items":read_json(p["items"])["items"], "relations":read_json(p["relations"])["relations"], "sources":read_json(p["sources"])["sources"], "session_refs":read_json(p["session_refs"])["session_refs"] if p["session_refs"].exists() else [], "evidence_links":read_json(p["evidence_links"])["evidence_links"] if p["evidence_links"].exists() else [], "events":read_events(p["events"])}
@@ -121,19 +124,71 @@ def append_events(p, events):
         f.flush()
         os.fsync(f.fileno())
 
-def write(root, state, events):
-    """Caller holds lock. Atomic per file; append-only event file. Validate before writing."""
+def write(root, state, events, expected_revision=None):
+    """Caller holds workspace lock. Crash-safe rollback journal, not a multi-file ACID database."""
     validate_state(state, strict=True)
     p=paths(root)
-    state["project"]["updated_at"]=now()
-    state["project"]["revision"]+=1
-    atomic_json(p["items"],{"items":state["items"]})
-    atomic_json(p["relations"],{"relations":state["relations"]})
-    atomic_json(p["sources"],{"sources":state["sources"]})
-    atomic_json(p["session_refs"],{"session_refs":state.get("session_refs",[])})
-    atomic_json(p["evidence_links"],{"evidence_links":state.get("evidence_links",[])})
-    atomic_json(p["project"],state["project"])
-    append_events(p, events)
+    current=read_json(p["project"])
+    if current.get("schema_version") != SCHEMA_VERSION:
+        raise ResearchError("旧版项目只读；请先执行 migrate_state.py apply")
+    if expected_revision is not None and current["revision"] != expected_revision:
+        raise ResearchError(f"stale write: expected revision {expected_revision}, actual {current['revision']}")
+    if state["project"]["revision"] != current["revision"]:
+        raise ResearchError("loaded state revision is stale; reload before modifying")
+    if p["journal"].exists():
+        raise ResearchError("存在未恢复的事务；请运行 migrate_state.py recover")
+    saved={}
+    for key in ("project","items","relations","sources","session_refs","evidence_links"):
+        saved[key]=p[key].read_text(encoding="utf-8") if p[key].exists() else None
+    saved["events"]=p["events"].read_text(encoding="utf-8") if p["events"].exists() else None
+    # Record undo journal before changing state; explicit recovery is required after a crash.
+    atomic_json(p["journal"], {"project_id":current["project_id"],
+       "revision":current["revision"],"before":saved})
+    try:
+        state["project"]["updated_at"]=now()
+        state["project"]["revision"]+=1
+        atomic_json(p["items"],{"items":state["items"]})
+        atomic_json(p["relations"],{"relations":state["relations"]})
+        atomic_json(p["sources"],{"sources":state["sources"]})
+        atomic_json(p["session_refs"],{"session_refs":state.get("session_refs",[])})
+        atomic_json(p["evidence_links"],{"evidence_links":state.get("evidence_links",[])})
+        atomic_json(p["project"],state["project"])
+        append_events(p, events)
+        p["journal"].unlink()
+    except Exception:
+        rollback_transaction(root, expected_id=current["project_id"])
+        raise
+
+
+def rollback_transaction(root, expected_id=None):
+    """Only call while the workspace lock is held. Restores pre-write bytes exactly."""
+    p=paths(root)
+    if not p["journal"].exists():
+        return False
+    journal=read_json(p["journal"])
+    if expected_id and journal.get("project_id") != expected_id:
+        raise ResearchError("事务的项目 ID 与当前项目不匹配")
+    original=journal["before"]
+    for key in ("project","items","relations","sources","session_refs","evidence_links","events"):
+        dest=p[key]
+        content=original.get(key)
+        if content is None:
+            if dest.exists():dest.unlink()
+        else:
+            atomic_text(dest,content)
+    p["journal"].unlink()
+    return True
+
+
+def atomic_text(path, text):
+    path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
+    fd,tmp=tempfile.mkstemp(prefix=".rn-restore-",dir=path.parent,text=True)
+    try:
+        with os.fdopen(fd,"w",encoding="utf-8") as out:
+            out.write(text);out.flush();os.fsync(out.fileno())
+        os.replace(tmp,path)
+    finally:
+        if os.path.exists(tmp):os.unlink(tmp)
 
 def require(value, allowed, label):
     if value not in allowed: raise ResearchError(f"{label}={value!r} 无效，可选: {', '.join(allowed)}")
@@ -355,7 +410,7 @@ def query(state, mode, user_authorized=False):
 def validate_state(s,strict=False):
     errors=[]
     p=s["project"]
-    if p.get("schema_version")!=SCHEMA_VERSION:errors.append("schema_version mismatch")
+    if p.get("schema_version") not in (SCHEMA_VERSION, LEGACY_SCHEMA_VERSION):errors.append("schema_version mismatch")
     ids=[i.get("id") for i in s["items"]]; source_ids=[x.get("id") for x in s["sources"]]
     if len(ids)!=len(set(ids)):errors.append("duplicate item IDs")
     if len(source_ids)!=len(set(source_ids)):errors.append("duplicate source IDs")
