@@ -33,3 +33,18 @@ jobs:
           python evals/make_demo.py /tmp/research-navigator-demo
           python scripts/validate_state.py /tmp/research-navigator-demo
           python scripts/migrate_state.py preview /tmp/research-navigator-demo
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright + Chromium
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Real browser canvas smoke
+        run: python evals/browser_check_canvas.py
