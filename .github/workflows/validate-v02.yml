@@ -1,0 +1,35 @@
+name: Validate Research Navigator v0.2
+
+on:
+  push:
+    branches:
+      - v0.2
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Syntax compile
+        run: python -m compileall -q scripts evals
+      - name: Unit and regression tests
+        run: python -m unittest discover -s evals -p 'test_*.py' -v
+      - name: Synthetic demo
+        run: |
+          python evals/make_demo.py /tmp/research-navigator-demo
+          python scripts/validate_state.py /tmp/research-navigator-demo
+          python scripts/migrate_state.py preview /tmp/research-navigator-demo
