@@ -52,6 +52,14 @@ jobs:
         run: python evals/browser_check_canvas_semantic.py
       - name: Real browser SessionRef smoke
         run: python evals/browser_check_canvas_sessions.py
+      - name: Upload synthetic Chromium screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-canvas-synthetic-screenshot
+          path: artifacts/research-canvas-synthetic.png
+          if-no-files-found: warn
+          retention-days: 30
 
   windows:
     name: Windows native Python and offline canvas smoke
