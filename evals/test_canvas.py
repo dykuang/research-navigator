@@ -118,6 +118,36 @@ class CanvasTests(unittest.TestCase):
         delete_layout(self.root,"Experiment A")
         self.assertEqual(set(load_views(self.root)["views"]),{"Research Routes"})
         self.assertTrue(build_canvas(self.root).exists())
+    def test_legacy_project_can_migrate_and_render_canvas_without_data_loss(self):
+        from rn_core import read_json, atomic_json
+        from migrate_state import apply,preview
+        idea=add_item(self.root,kind="Idea",title="Synthetic migrated idea",module="topic")
+        before=load(self.root)
+        project=read_json(paths(self.root)["project"])
+        project["schema_version"]="0.1.0"
+        atomic_json(paths(self.root)["project"],project)
+        paths(self.root)["session_refs"].unlink()
+        paths(self.root)["evidence_links"].unlink()
+        self.assertTrue(preview(self.root)["needs_migration"])
+        migrated=apply(self.root)
+        self.assertEqual(migrated["status"],"migrated")
+        self.assertEqual(load(self.root)["items"],before["items"])
+        html=build_canvas(self.root).read_text(encoding="utf-8")
+        self.assertIn(idea["id"],html)
+        self.assertIn('id="minimap"',html)
+        self.assertEqual(load(self.root)["project"]["schema_version"],"0.2.0")
+    def test_canvas_new_nodes_after_saved_layout_receive_default_positions(self):
+        a=add_item(self.root,kind="Idea",title="A",module="topic")
+        x=self.payload();x["positions"]={"item:"+a["id"]:{"x":100,"y":200}}
+        save_layout(self.root,x)
+        before=load_views(self.root)
+        add_item(self.root,kind="Idea",title="B",module="topic")
+        html=build_canvas(self.root).read_text(encoding="utf-8")
+        match=re.search(r'<script type="application/json" id="rn-views">(.*?)</script>',html,re.S)
+        saved=json.loads(match.group(1))
+        self.assertEqual(saved["views"]["default"]["positions"],before["views"]["default"]["positions"])
+        self.assertEqual(len(load(self.root)["items"]),2)
+
     def test_canvas_creation_does_not_append_research_events(self):
         self.fixture()
         before=load(self.root)
