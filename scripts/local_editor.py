@@ -321,8 +321,23 @@ def main():
             return
         proposal = inspect_proposal(args.root,args.proposal_id)
         print(json.dumps(proposal,ensure_ascii=False,indent=2))
+        # Terminal operator sees the same before/after and downstream impact
+        # that the browser preview showed, before confirming any mutation.
+        preview_error = None
+        if proposal.get("status") == "pending":
+            try:
+                payload = {key:proposal[key] for key in
+                           ("operation","params","reason","expected_revision")}
+                preview = preview_proposal(args.root,payload)
+                print("\\nSIMULATED BEFORE / AFTER / IMPACT (NOT APPLIED):")
+                print(json.dumps(preview,ensure_ascii=False,indent=2))
+            except (ResearchError,KeyError) as exc:
+                preview_error = str(exc)
+                print("Preview unavailable (stale or invalid): "+preview_error)
         if args.operation == "inspect":
             return
+        if args.operation == "approve" and preview_error:
+            raise ResearchError("Cannot approve without a valid current preview: "+preview_error)
         if not sys.stdin.isatty():
             raise ResearchError("Approval/rejection must be performed from an interactive local terminal")
         phrase = "APPROVE "+args.proposal_id if args.operation=="approve" else "REJECT "+args.proposal_id
