@@ -24,6 +24,14 @@
 
 现有 `research/dashboard/index.html` 依然完全离线、只读；正在规划的无限画布 #8/#10 尚未实现。
 
+## v0.2 无限科研画布（#7–#9）
+
+已新增不依赖 CDN 或外部 JS 的**无限研究画布**。在项目根目录运行 `python scripts/build_dashboard.py PROJECT_ROOT` 后，会同时生成经典只读 SVG 工作台和 `research/canvas/index.html`。后者提供自由平移/缩放、拖动卡片、迷你地图、研究路线/证据/成果切换、过滤与详情检查，并能导出只读 SVG。
+
+节点位置、视口、折叠和固定模块组只属于**视图层**。浏览器“保存布局”存储在当前浏览器；可导出 JSON，再通过 `python scripts/canvas_views.py save PROJECT_ROOT LAYOUT_FILE --name default` 写入 `research/canvas/views.json`，重新生成画布即可跨设备或版本恢复布局。这**不会修改科学证据、研究状态或审批历史**。
+
+具体操作、离线兼容说明和限制见 [Canvas 使用指南](references/canvas-guide.md)。真正的画布语义编辑与 #6 提案接口整合仍计划在 #10，实现前不会出现虚假审批或“保存科研成果”按钮。
+
 ## 30 秒起步
 
 需要 Python 3.10+，不需要第三方包。以下命令从 Skill 目录执行：
