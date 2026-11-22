@@ -48,3 +48,5 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Real browser canvas smoke
         run: python evals/browser_check_canvas.py
+      - name: Real browser semantic editing smoke
+        run: python evals/browser_check_canvas_semantic.py
