@@ -100,7 +100,7 @@ function defaultPositions(){
   const groups=new Map(); sorted.forEach(n=>{const key=n.module||"session";if(!groups.has(key))groups.set(key,[]);groups.get(key).push(n)});
   let group=0;const out={};
   for(const batch of groups.values()){
-    batch.forEach((n,i)=>{out[n.id]={x:group*300+(i%2)*215,y:Math.floor(i/2)*142}});
+    batch.forEach((n,i)=>{out[n.id]={x:group*465+(i%2)*215,y:Math.floor(i/2)*142}});
     group++;
   }
   return out;
@@ -232,7 +232,6 @@ function startNodeDrag(ev,id){
   ev.stopPropagation();
   state.drag={kind:"node",id,startX:ev.clientX,startY:ev.clientY,
     ox:state.positions[id].x,oy:state.positions[id].y,moved:false};
-  ev.currentTarget.setPointerCapture(ev.pointerId);
   selectNode(id);
 }
 function nodeKey(ev,id){
@@ -251,7 +250,7 @@ viewport.addEventListener("pointerdown",ev=>{
     ox:state.camera.x,oy:state.camera.y};
   viewport.setPointerCapture(ev.pointerId);viewport.classList.add("dragging");
 });
-viewport.addEventListener("pointermove",ev=>{
+window.addEventListener("pointermove",ev=>{
   if(!state.drag)return;
   const d=state.drag,dx=ev.clientX-d.startX,dy=ev.clientY-d.startY;
   if(d.kind==="pan"){
@@ -263,7 +262,7 @@ viewport.addEventListener("pointermove",ev=>{
   render();
 });
 function release(){state.drag=null;viewport.classList.remove("dragging")}
-viewport.addEventListener("pointerup",release);viewport.addEventListener("pointercancel",release);
+window.addEventListener("pointerup",release);window.addEventListener("pointercancel",release);
 function zoomAt(factor,px,py){
   const old=state.camera.z,newZ=clamp(old*factor,.12,4.5),ratio=newZ/old;
   state.camera.x=px-(px-state.camera.x)*ratio;
