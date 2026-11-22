@@ -289,6 +289,9 @@ def dependents(state, ident):
         if t=="depends-on" and b==ident:out.add(a)
         elif t in ("supports","tests","implements","contributes-to","member-of") and a==ident:out.add(b)
         elif t=="supersedes" and b==ident:out.add(a)
+    for rel in state.get("evidence_links", []):
+        if rel.get("evidence_id") == ident:
+            out.add(rel["claim_id"])
     return out
 
 def propagate(state, ident, actor, reason, block=False):
