@@ -62,6 +62,10 @@ description: Use when a student or advisor wants to initiate, scope, investigate
 
 成果总结不要求所有其他模块结束。**结构化状态文件是唯一权威源**；Markdown 文字材料和 HTML 是可复核的工作文档/派生视图，不应相互矛盾。
 
+## 可选本机提案接口（#6）
+
+`scripts/local_editor.py serve PROJECT_ROOT` 可在本机启动只接受 `127.0.0.1` 请求的受限提案服务；浏览器只允许**排队待审批提案**，不能直接写科研状态、确认/回收科研方向或假装完成科学验证。用户必须在**交互终端**执行 `inspect` 后逐条 `approve` 或 `reject`，服务端再次校验项目 revision 和全部状态约束，成功时写入事件记录。若服务未运行，原离线 HTML 仍为只读。安全边界和命令见 `references/local-bridge-security.md`。
+
 ## 常用命令与工具
 
 所有 CLI 都使用 Python 标准库，无网络要求。详细 CLI 例子见 `references/cli-recipes.md`。
