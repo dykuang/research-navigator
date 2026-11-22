@@ -32,6 +32,14 @@
 
 具体操作、离线兼容说明和限制见 [Canvas 使用指南](references/canvas-guide.md)。真正的画布语义编辑与 #6 提案接口整合仍计划在 #10，实现前不会出现虚假审批或“保存科研成果”按钮。
 
+## v0.2 画布语义提案与人工审批（#10）
+
+在 `python scripts/local_editor.py serve PROJECT_ROOT` 打印的私有本机地址打开服务首页，点击 **Open interactive Research Canvas**。这与之前独立的只读 HTML 画布不同：本机画布从受令牌保护的 `/api/graph` 读取**当前权威科研状态**，支持创建 Idea/Hypothesis/Task、ResearchBranch、科学 Milestone，安全建立/撤销关系，添加证据引用和修改待确认的验收条件。
+
+任何修改都须 **模拟预览（显示变更前后与影响）→ 提交待审批提案 → 本机交互终端逐条审阅并批准/拒绝 → 刷新科研图**。浏览器无直接批准或执行科研实验的能力。修改真实状态的审批命令为 `python scripts/local_editor.py approve PROJECT_ROOT PROPOSAL_ID`，必须在交互终端输入完整确认文本；旧修订版本、非法归档操作和无效证据会被拒绝。
+
+不启动服务时，`research/canvas/index.html` 仍是自包含、离线、只读 HTML，允许**导出提案草案 JSON**而不是虚假的“保存科研结果”。详见 [画布指南](references/canvas-guide.md) 与 [本机写回安全说明](references/local-bridge-security.md)。**终端确认不是身份认证，人工批准也不等于科学验证**。
+
 ## 30 秒起步
 
 需要 Python 3.10+，不需要第三方包。以下命令从 Skill 目录执行：
