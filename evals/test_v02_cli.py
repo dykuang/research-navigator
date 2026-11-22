@@ -27,7 +27,12 @@ class V02CLITests(unittest.TestCase):
         )
         self.assertEqual(cp.returncode, expect,
                          f"{script} {' '.join(args)}\nstdout={cp.stdout}\nstderr={cp.stderr}")
-        return json.loads(cp.stdout) if cp.stdout.strip() else None
+        if not cp.stdout.strip():
+            return None
+        try:
+            return json.loads(cp.stdout)
+        except json.JSONDecodeError:
+            return cp.stdout.strip()
 
     def test_cli_branch_milestone_and_session(self):
         project = str(self.project)
