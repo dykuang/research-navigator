@@ -69,12 +69,32 @@ def main():
             page.mouse.up()
             after=page.locator('[data-node="item:IDEA-0001"]').get_attribute("style")
             assert after!=start,("Card did not drag",start,after)
+            moved={"IDEA-0001":after}
+            # Exercise ten independent real pointer drags before persistence.
+            for i in range(2,11):
+                item_id="IDEA-"+str(i).zfill(4)
+                page.locator("#search").fill(item_id)
+                page.locator("#fit").click()
+                target=page.locator('[data-node="item:'+item_id+'"]')
+                original_style=target.get_attribute("style")
+                box=target.bounding_box()
+                assert box is not None
+                page.mouse.move(box["x"]+30,box["y"]+30)
+                page.mouse.down()
+                page.mouse.move(box["x"]+65,box["y"]+50,steps=4)
+                page.mouse.up()
+                changed_style=page.locator('[data-node="item:'+item_id+'"]').get_attribute("style")
+                assert changed_style!=original_style, ("Failed dragging",item_id)
+                moved[item_id]=changed_style
+            page.locator("#search").fill("")
 
             # Save/reload in same browser origin restores view coordinates.
             page.locator("#saveLayout").click()
             assert "布局已保存在此浏览器" in page.locator("#notice").inner_text()
             page.reload(wait_until="load")
-            assert page.locator('[data-node="item:IDEA-0001"]').get_attribute("style")==after
+            for item_id,expected_style in moved.items():
+                actual=page.locator('[data-node="item:'+item_id+'"]').get_attribute("style")
+                assert actual==expected_style,("Restored node does not match",item_id,actual,expected_style)
             page.locator("#view").select_option("evidence")
             assert page.locator(".node").count()<23
             page.locator("#view").select_option("all")
