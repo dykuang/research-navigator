@@ -81,7 +81,10 @@ button:disabled{opacity:.5;cursor:default}
 <div id="hint">拖动空白处平移 · 滚轮缩放 · 拖动卡片仅改变布局 · 聚焦卡片后按方向键移动 · Enter 查看详情</div>
 </section>
 <aside id="inspector" aria-live="polite"><div><h2>节点详情</h2><div id="details" class="info">请选择画布中的研究节点。关联证据、实验状态与分支信息在此展示。</div></div>
-<div id="semanticEditor">
+<div id="sessionInspector"><h2>Agent 会话溯源</h2>
+<label for="sessionProviderFilter">Provider</label><select id="sessionProviderFilter"><option value="">全部</option><option value="codex">Codex</option><option value="chatgpt">ChatGPT</option><option value="other">Other</option></select>
+<label for="sessionWorkspaceFilter">工作空间筛选</label><input id="sessionWorkspaceFilter" placeholder="Workspace ID"><div id="sessionRecords" class="info">选择节点查看关联会话</div>
+<p class="info">只显示元数据。未验证的 URL 不会自动打开，支持复制真实 Session ID。</p></div><div id="semanticEditor">
 <h2>科研语义提案</h2>
 <p id="editMode" class="info">离线只读：可以导出提案 JSON，正式修改需要本机提案服务。</p>
 <label for="semanticOperation">操作类型</label>
@@ -99,6 +102,7 @@ button:disabled{opacity:.5;cursor:default}
 <option value="begin-revival-review">启动正式回收复审（第一批准）</option>
 <option value="approve-revival-candidate">创建派生候选（第二批准）</option>
 <option value="reject-revival-review">拒绝回收复审</option>
+<option value="register-session">登记 SessionRef</option><option value="link-session">关联会话和科研实体</option><option value="unlink-session">撤销 SessionRef 关联</option>
 </select>
 <label for="semanticParams">操作参数（可编辑 JSON）</label>
 <textarea id="semanticParams" spellcheck="false" aria-label="语义提案参数 JSON"></textarea>
@@ -274,6 +278,7 @@ function selectNode(id){
     section("规划资格",node.actionable?"当前允许规划，仍需核验证据":"当前不得自动纳入正向规划或标记科学验证");
   section("相关关系",related.length?related.map(e=>e.from+" —"+e.type+"→ "+e.to+
     " ("+e.provenance.collection+")").join("\n"):"暂无");
+  renderSessions(id);
   const stamp=document.createElement("div");stamp.className="info";
   stamp.textContent="节点修订 "+safeText(node.revision)+" · 操作不修改研究状态";box.appendChild(stamp);
 }
@@ -409,7 +414,10 @@ function exampleParams(op){
     "approve-revival-candidate":{item_id:id,title:"Derived hypothesis to test",
       new_conditions:"New independent experiment or dataset",
       approval_note:"Second separate approval after reviewing old failures"},
-    "reject-revival-review":{item_id:id,decision_note:"No sufficiently changed conditions"}
+    "reject-revival-review":{item_id:id,decision_note:"No sufficiently changed conditions"},
+    "register-session":{provider:"codex",workspace_id:"research-project",session_id:"actual-session-id",url:""},
+    "link-session":{session_ref_id:"SESS-0001",entity_id:id,role:"discussion"},
+    "unlink-session":{session_ref_id:"SESS-0001",entity_id:id}
   };
   return examples[op];
 }
@@ -445,6 +453,7 @@ async function connectLive(){
     snapshotKey="rn-canvas:"+graph.project_id+":views";
     liveReady=true;
     chooseStartup();
+    renderSessions(state.selected);
     $("editMode").textContent="本机受控提案模式 · 状态修订 "+graph.project_revision+
       " · 审批必须回到本机交互终端";
     $("previewSemantic").disabled=false;$("refreshSemantic").disabled=false;
@@ -467,6 +476,7 @@ function initializeFreshGraph(fresh){
     " · 终端人工确认，不自动认可任何研究真值";
   if(graph.project_revision!==previousRevision)invalidatePreview();
   render();
+  renderSessions(state.selected);
 }
 async function refreshLive(){
   if(!liveReady)return;
@@ -509,6 +519,55 @@ async function queueSemantic(){
     $("semanticState").textContent="待终端审批："+pendingProposal+"（科研状态尚未更改）";
   }catch(e){invalidatePreview();$("semanticState").textContent="提案提交失败："+e.message}
 }
+function verifiedSessionUrl(ref){
+  const meta=ref.metadata||{};
+  if(!ref.statuses||ref.statuses.url_verified!==true)return null;
+  try{
+    const u=new URL(meta.url||"");
+    return u.protocol==="https:"&&!u.username&&!u.password&&!u.search&&!u.hash?u.href:null;
+  }catch{return null}
+}
+function renderSessions(selectedId){
+  const container=$("sessionRecords");if(!container)return;container.replaceChildren();
+  const provider=$("sessionProviderFilter").value;
+  const workspace=$("sessionWorkspaceFilter").value.toLocaleLowerCase().trim();
+  const sessions=graph.nodes.filter(n=>n.kind==="session-ref"&&
+    (!provider||n.metadata.provider===provider)&&
+    (!workspace||(n.metadata.workspace_id||"").toLocaleLowerCase().includes(workspace))&&
+    (!selectedId||n.id===selectedId||allEdges.some(e=>
+      e.provenance.collection==="session_refs"&&e.from===n.id&&e.to===selectedId)));
+  if(!sessions.length){
+    container.textContent="无匹配会话。可调整过滤或在右侧添加 SessionRef 提案。";return;
+  }
+  sessions.forEach(ref=>{
+    const m=ref.metadata||{},box=document.createElement("div");
+    box.className="warn info";box.style.margin="8px 0";
+    const roles=allEdges.filter(e=>e.from===ref.id&&e.to===selectedId&&
+      e.provenance.collection==="session_refs").map(e=>e.type.replace(/^session:/,""));
+    const title=document.createElement("strong");
+    title.textContent=ref.entity_id+" · "+m.provider+" · "+(roles.join(", ")||"registered");
+    box.appendChild(title);
+    for(const content of ["Workspace: "+(m.workspace_id||"unknown"),
+       "Session ID: "+(m.session_id||"unknown"),
+       "Recorded: "+(m.recorded_by||"unknown")+" @ "+(m.recorded_at||"unknown")]){
+      const line=document.createElement("div");line.textContent=content;box.appendChild(line);
+    }
+    const copy=document.createElement("button");copy.textContent="复制 Session ID";
+    copy.onclick=async()=>{try{
+      await navigator.clipboard.writeText(m.session_id||"");notice("已复制会话 ID");
+    }catch{notice("剪贴板不可用，请手动复制上方 Session ID")}};
+    box.appendChild(copy);
+    const target=verifiedSessionUrl(ref);
+    if(target){
+      const go=document.createElement("button");go.textContent="打开已验证会话";
+      go.onclick=()=>window.open(target,"_blank","noopener,noreferrer");box.appendChild(go);
+    }else{
+      const warn=document.createElement("div");warn.textContent="未验证的 provider 深链接；禁止自动跳转";
+      box.appendChild(warn);
+    }
+    container.appendChild(box);
+  });
+}
 function initSemantic(){
   $("semanticOperation").onchange=updateEditorExample;
   $("useSelected").onclick=updateEditorExample;
@@ -524,6 +583,8 @@ function initSemantic(){
       $("semanticState").textContent="草案已导出；未进入审批队列，未更改科研状态";
     }catch(e){$("semanticState").textContent="导出失败："+e.message}
   };
+  $("sessionProviderFilter").addEventListener("change",()=>renderSessions(state.selected));
+  $("sessionWorkspaceFilter").addEventListener("input",()=>renderSessions(state.selected));
   updateEditorExample();
 }
 
@@ -591,7 +652,7 @@ $("search").addEventListener("input",render);
 $("zoomIn").onclick=()=>zoomAt(1.2,viewport.clientWidth/2,viewport.clientHeight/2);
 $("zoomOut").onclick=()=>zoomAt(1/1.2,viewport.clientWidth/2,viewport.clientHeight/2);
 $("fit").onclick=fitAll;$("focus").onclick=focusSelected;
-$("unselect").onclick=()=>{state.selected=null;$("details").textContent="请选择一个节点";render()};
+$("unselect").onclick=()=>{state.selected=null;$("details").textContent="请选择一个节点";render();renderSessions(null)};
 $("collapse").onclick=()=>{
   if(!state.selected){notice("先选择节点，再折叠或展开直接邻居");return}
   const neighbors=new Set();
