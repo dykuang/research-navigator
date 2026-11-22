@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import copy
 
-from rn_core import (ResearchError, RELATIONS, OUTCOME, WORKFLOW, item_by_id,
-                     new_item, now, propagate, require, validate_state)
+from rn_core import (ResearchError, RELATIONS, OUTCOME, WORKFLOW, ARCHIVED, FAILURE,
+                     item_by_id, new_item, now, propagate, require, validate_state)
 from rn_v02 import STANCES, EVIDENCE_QUALITIES
 
 SAFE_RELATIONS = ("depends-on", "member-of", "contributes-to", "tests", "implements")
@@ -18,6 +18,8 @@ CANVAS_OPERATIONS = (
     "add-item", "add-relation", "unlink-relation", "set-status",
     "add-branch", "add-milestone", "revise-criterion", "attach-milestone-evidence",
     "link-evidence",
+    "archive-route", "begin-revival-review", "approve-revival-candidate",
+    "reject-revival-review",
 )
 
 
@@ -42,6 +44,12 @@ def validate_extra(operation, args):
         "revise-criterion": {"milestone_id", "criterion_id", "text"},
         "attach-milestone-evidence": {"milestone_id", "criterion_id", "evidence_id"},
         "link-evidence": {"claim_id", "evidence_id", "stance", "scope", "quality", "locator", "note"},
+        "archive-route": {"item_id", "lifecycle", "failure_scope", "failure_category",
+                          "revival_triggers", "confidence", "lesson", "cost", "evidence_refs"},
+        "begin-revival-review": {"item_id", "question", "new_conditions"},
+        "approve-revival-candidate": {"item_id", "title", "new_conditions",
+                                     "approval_note"},
+        "reject-revival-review": {"item_id", "decision_note"},
     }
     if operation not in allowed:
         raise ResearchError("unsupported canvas semantic operation")
@@ -76,6 +84,32 @@ def validate_extra(operation, args):
             raise ResearchError("evidence attachment requires milestone, criterion and evidence")
         for key in args:
             _text(args[key], key, 120)
+    elif operation == "archive-route":
+        _text(args.get("item_id"), "archived item", 120)
+        if args.get("lifecycle") not in ARCHIVED:
+            raise ResearchError("archive lifecycle must be parked/quarantined/retired")
+        _text(args.get("failure_scope"), "negative evidence limitation")
+        _text(args.get("revival_triggers"), "revival triggers")
+        if args.get("failure_category", "unknown") not in FAILURE:
+            raise ResearchError("invalid failure category")
+        for key in ("confidence", "lesson", "cost"):
+            if key in args and args[key]:
+                _text(args[key], key, 1000)
+        refs=args.get("evidence_refs",[])
+        if not isinstance(refs,list) or len(refs)>30 or any(not isinstance(i,str) or len(i)>120 for i in refs):
+            raise ResearchError("invalid archive evidence references")
+    elif operation == "begin-revival-review":
+        _text(args.get("item_id"), "archived item", 120)
+        _text(args.get("question"), "review question")
+        _text(args.get("new_conditions"), "changed circumstances")
+    elif operation == "approve-revival-candidate":
+        _text(args.get("item_id"), "reviewed item", 120)
+        _text(args.get("title"), "candidate title", 250)
+        _text(args.get("new_conditions"), "new conditions")
+        _text(args.get("approval_note"), "second explicit human authorization")
+    elif operation == "reject-revival-review":
+        _text(args.get("item_id"), "reviewed item", 120)
+        _text(args.get("decision_note"), "review rejection rationale")
     elif operation == "link-evidence":
         for key in ("claim_id", "evidence_id", "stance", "scope"):
             _text(args.get(key), key, 1000)
@@ -272,6 +306,84 @@ def apply_to_state(state, clean, proposal_id="preview"):
             events.append(_event("impact-propagated",claim["id"],proposal_id,reason,
                                  {"impact_status":"needs-review"},{"impact_status":before}))
             events += propagate(state,claim["id"],"user","contradictory evidence")
+    elif op == "archive-route":
+        item = item_by_id(state, args["item_id"])
+        if item["type"] not in ("ResearchQuestion","Idea","Method","Hypothesis",
+                                "ExperimentPath","Baseline","Experiment","ResearchBranch"):
+            raise ResearchError("this entity cannot be archived as a research route")
+        old=item["lifecycle_status"]
+        if old=="under-revival-review":
+            raise ResearchError("finish formal revival review before archiving")
+        if old == args["lifecycle"]:
+            raise ResearchError("archive state unchanged")
+        refs=args.get("evidence_refs",item.get("evidence_refs",[]))
+        known={x["id"] for x in state["items"]+state["sources"]}
+        if any(ref not in known for ref in refs):
+            raise ResearchError("unknown archive evidence reference")
+        if item.get("archive"):
+            item.setdefault("archive_history",[]).append(copy.deepcopy(item["archive"]))
+        item["archive"]={"reason":reason,"failure_category":args.get("failure_category","unknown"),
+            "failure_scope":args["failure_scope"],"diagnostic_confidence":args.get("confidence","uncertain"),
+            "revival_triggers":args["revival_triggers"],"lesson":args.get("lesson",""),
+            "cost":args.get("cost",""),"decided_by":"user","decided_at":now(),
+            "evidence_refs":refs,"previous_state":old}
+        item["revival"]=None
+        item["lifecycle_status"]=args["lifecycle"]
+        _touch(item)
+        result={"id":item["id"],"lifecycle_status":item["lifecycle_status"],
+                "archive":copy.deepcopy(item["archive"])}
+        events.append(_event("status-changed",item["id"],proposal_id,reason,
+                             {"lifecycle_status":args["lifecycle"]},{"lifecycle_status":old}))
+        events+=propagate(state,item["id"],"user",reason,
+                          block=args["lifecycle"] in ("quarantined","retired"))
+    elif op == "begin-revival-review":
+        item=item_by_id(state,args["item_id"])
+        if item["lifecycle_status"] not in ARCHIVED or not item.get("archive"):
+            raise ResearchError("only archived entities enter formal revival review")
+        old=item["lifecycle_status"]
+        item["revival"]={"original_lifecycle":old,"question":args["question"],
+            "new_conditions":args["new_conditions"],"requested_by":"user",
+            "requested_at":now(),"approved_candidate":None}
+        item["lifecycle_status"]="under-revival-review"
+        _touch(item)
+        result={"id":item["id"],"lifecycle_status":"under-revival-review"}
+        events.append(_event("status-changed",item["id"],proposal_id,reason,
+            result,{"lifecycle_status":old}))
+        events+=propagate(state,item["id"],"user","archived route under formal review")
+    elif op == "approve-revival-candidate":
+        old=item_by_id(state,args["item_id"])
+        if old["lifecycle_status"]!="under-revival-review" or not old.get("revival"):
+            raise ResearchError("first formal revival review approval is required")
+        if args["new_conditions"].strip()==old["archive"].get("failure_scope","").strip():
+            raise ResearchError("candidate must describe changed conditions, not repeat known failure")
+        previous=old["revival"]["original_lifecycle"]
+        candidate=new_item(state,old["type"],args["title"],old["module"],
+            description=f"由 {old['id']} 派生；变化：{args['new_conditions']}；待验证：{reason}",
+            actor="user",workflow="to-be-determined",epistemic="hypothesis",
+            review="needs-user-confirmation",next_action="设计最低成本证伪/复现实验",
+            derived_from=old["id"])
+        for kind in ("derived-from","revives"):
+            state["relations"].append({"from":candidate["id"],"to":old["id"],"type":kind})
+        old["lifecycle_status"]=previous
+        old["revival"]=None
+        _touch(old)
+        result={"id":candidate["id"],"type":candidate["type"],
+                "derived_from":old["id"],"original_lifecycle":previous}
+        events.append(_event("revival-candidate-created",candidate["id"],proposal_id,reason,
+            {**result,"new_conditions":args["new_conditions"],
+             "approval_note":args["approval_note"]},
+            {"original_lifecycle":"under-revival-review","parent_id":old["id"]}))
+    elif op == "reject-revival-review":
+        old=item_by_id(state,args["item_id"])
+        if old["lifecycle_status"]!="under-revival-review" or not old.get("revival"):
+            raise ResearchError("not under formal revival review")
+        previous=old["revival"]["original_lifecycle"]
+        old["revival"]=None
+        old["lifecycle_status"]=previous
+        _touch(old)
+        result={"id":old["id"],"lifecycle_status":previous}
+        events.append(_event("revival-review-rejected",old["id"],proposal_id,
+                             args["decision_note"],result))
     else:
         raise ResearchError("unknown semantic operation")
     # Must use same canonical validator before previewing or committing.
