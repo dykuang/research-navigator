@@ -10,7 +10,8 @@ import copy
 
 from rn_core import (ResearchError, RELATIONS, OUTCOME, WORKFLOW, ARCHIVED, FAILURE,
                      item_by_id, new_item, now, propagate, require, validate_state)
-from rn_v02 import STANCES, EVIDENCE_QUALITIES
+from rn_v02 import (STANCES, EVIDENCE_QUALITIES, SESSION_PROVIDERS, SESSION_ROLES)
+from urllib.parse import urlsplit
 
 SAFE_RELATIONS = ("depends-on", "member-of", "contributes-to", "tests", "implements")
 SAFE_STATUSES = ("to-be-determined", "ready-for-agent", "to-be-implemented", "in-progress")
@@ -20,6 +21,7 @@ CANVAS_OPERATIONS = (
     "link-evidence",
     "archive-route", "begin-revival-review", "approve-revival-candidate",
     "reject-revival-review",
+    "register-session", "link-session", "unlink-session",
 )
 
 
@@ -50,6 +52,9 @@ def validate_extra(operation, args):
         "approve-revival-candidate": {"item_id", "title", "new_conditions",
                                      "approval_note"},
         "reject-revival-review": {"item_id", "decision_note"},
+        "register-session": {"provider", "workspace_id", "session_id", "url"},
+        "link-session": {"session_ref_id", "entity_id", "role"},
+        "unlink-session": {"session_ref_id", "entity_id"},
     }
     if operation not in allowed:
         raise ResearchError("unsupported canvas semantic operation")
@@ -110,6 +115,29 @@ def validate_extra(operation, args):
     elif operation == "reject-revival-review":
         _text(args.get("item_id"), "reviewed item", 120)
         _text(args.get("decision_note"), "review rejection rationale")
+    elif operation == "register-session":
+        if args.get("provider") not in SESSION_PROVIDERS:
+            raise ResearchError("unsupported session provider")
+        _text(args.get("workspace_id"), "session workspace", 200)
+        _text(args.get("session_id"), "external session id", 300)
+        url = args.get("url", "")
+        if not isinstance(url, str) or len(url)>1000:
+            raise ResearchError("invalid external session URL")
+        if url:
+            parsed=urlsplit(url)
+            if (parsed.scheme!="https" or not parsed.hostname or parsed.username
+                or parsed.password or parsed.query or parsed.fragment):
+                raise ResearchError("unverified external link must be clean HTTPS")
+    elif operation == "link-session":
+        for key in ("session_ref_id","entity_id"):
+            _text(args.get(key), key, 200)
+        if args.get("role") not in SESSION_ROLES:
+            raise ResearchError("invalid session role")
+    elif operation == "unlink-session":
+        if set(args)!={"session_ref_id","entity_id"}:
+            raise ResearchError("unlink-session requires exact session/entity pair")
+        for key in ("session_ref_id","entity_id"):
+            _text(args[key], key, 200)
     elif operation == "link-evidence":
         for key in ("claim_id", "evidence_id", "stance", "scope"):
             _text(args.get(key), key, 1000)
@@ -384,6 +412,42 @@ def apply_to_state(state, clean, proposal_id="preview"):
         result={"id":old["id"],"lifecycle_status":previous}
         events.append(_event("revival-review-rejected",old["id"],proposal_id,
                              args["decision_note"],result))
+    elif op == "register-session":
+        provider,workspace,sid=args["provider"],args["workspace_id"],args["session_id"]
+        if any(x["provider"]==provider and x["workspace_id"]==workspace
+               and x["session_id"]==sid for x in state["session_refs"]):
+            raise ResearchError("duplicate external SessionRef")
+        taken={x["id"] for x in state["session_refs"]}
+        counter=1
+        while f"SESS-{counter:04d}" in taken:
+            counter+=1
+        row={"id":f"SESS-{counter:04d}","provider":provider,
+             "workspace_id":workspace,"session_id":sid,"url":args.get("url",""),
+             "url_verified":False,"entity_ids":[],"roles":{},
+             "recorded_by":"user","recorded_at":now()}
+        state["session_refs"].append(row)
+        result={"id":row["id"],"provider":provider,"workspace_id":workspace}
+        events.append(_event("session-registered",row["id"],proposal_id,reason,row))
+    elif op in ("link-session","unlink-session"):
+        ref=next((s for s in state["session_refs"] if s["id"]==args["session_ref_id"]),None)
+        if ref is None:
+            raise ResearchError("SessionRef not found")
+        entity=item_by_id(state,args["entity_id"])
+        if op=="link-session":
+            if entity["id"] in ref["entity_ids"]:
+                raise ResearchError("duplicate SessionRef entity link")
+            ref["entity_ids"].append(entity["id"])
+            ref["roles"][entity["id"]]=args["role"]
+            action="session-entity-linked"
+        else:
+            if entity["id"] not in ref["entity_ids"]:
+                raise ResearchError("SessionRef link not found")
+            ref["entity_ids"].remove(entity["id"])
+            ref["roles"].pop(entity["id"])
+            action="session-entity-unlinked"
+        result={"session_ref_id":ref["id"],"entity_id":entity["id"],
+                "role":args.get("role", "removed")}
+        events.append(_event(action,ref["id"],proposal_id,reason,result))
     else:
         raise ResearchError("unknown semantic operation")
     # Must use same canonical validator before previewing or committing.
