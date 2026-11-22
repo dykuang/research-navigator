@@ -353,9 +353,14 @@ function renderMini(){
     state.camera.y=r.height/2-y*state.camera.z;render();
   };
 }
-const liveToken=decodeURIComponent(location.hash.replace(/^#token=/,""));
-if(liveToken&&location.protocol==="http:"){
-  history.replaceState(null,"",location.pathname);
+const fragmentToken=decodeURIComponent(location.hash.replace(/^#token=/,""));
+let liveToken=fragmentToken;
+if(location.protocol==="http:"&&location.hostname==="127.0.0.1"){
+  try{
+    if(fragmentToken)sessionStorage.setItem("rn_canvas_local_capability",fragmentToken);
+    else liveToken=sessionStorage.getItem("rn_canvas_local_capability")||"";
+  }catch(e){ /* sessionStorage may be blocked: user can reopen launch URL */ }
+  if(fragmentToken)history.replaceState(null,"",location.pathname);
 }
 let liveReady=false,previewed=null,pendingProposal=null;
 function semanticPayload(){
