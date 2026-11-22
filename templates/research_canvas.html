@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Research Navigator · Infinite Research Canvas</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI","Microsoft Yahei",sans-serif;color:#16283e;background:#eef3f8;font-size:13px}
+*{box-sizing:border-box}body{margin:0}button,select,input{font:inherit}button{cursor:pointer}
+#app{display:grid;grid-template-columns:235px minmax(0,1fr) 286px;grid-template-rows:54px minmax(0,1fr);height:100vh;min-height:450px}
+header{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:0 18px;background:#12283e;color:#f3fbff;border-bottom:1px solid #35516b}
+header strong{font-size:16px}header small{color:#a9c4cf;flex:1}header a{color:#c2eadd}
+aside{background:#fff;min-height:0;overflow:auto;padding:16px;border-right:1px solid #dbe4ed}
+#inspector{border-right:0;border-left:1px solid #dbe4ed}
+aside h2{font-size:14px;margin:4px 0 15px}aside h3{font-size:12px;margin:19px 0 6px}
+label{display:block;margin:11px 0 4px;font-weight:650;color:#3a5167}
+select,input{width:100%;padding:8px 9px;border:1px solid #cad8e3;border-radius:8px;background:#fff;color:#16283e}
+.row{display:flex;gap:6px;flex-wrap:wrap}.row button{flex:1}
+button{border:1px solid #c5d6e4;background:#fff;border-radius:8px;padding:7px 9px;color:#21485c}
+button:hover,button:focus-visible{background:#e3f2f4;outline-color:#258c97}
+button.primary{background:#146f7a;color:white;border-color:#146f7a}
+button:disabled{opacity:.5;cursor:default}
+.chip{display:inline-block;background:#e6eef5;color:#3b546d;border-radius:7px;padding:2px 6px;margin:2px;font-size:11px}
+.info{font-size:12px;color:#607488;line-height:1.55}.warn{background:#fff7e7;padding:9px;border:1px solid #f2d9a6;border-radius:9px}
+#workspace{min-width:0;min-height:0;position:relative;overflow:hidden;background-color:#f4f7fb;background-image:radial-gradient(#b4c3d5 0.8px,transparent 0.8px);background-size:21px 21px;touch-action:none;cursor:grab}
+#workspace.dragging{cursor:grabbing}
+#world{position:absolute;top:0;left:0;transform-origin:0 0;width:1px;height:1px}
+#edges{position:absolute;top:0;left:0;width:1px;height:1px;overflow:visible;pointer-events:none}
+.node{position:absolute;width:190px;min-height:83px;border:1px solid #9bb3cb;border-left:4px solid #4a8b9a;border-radius:11px;padding:9px;background:#fff;box-shadow:0 5px 15px #17344c18;user-select:none;touch-action:none;cursor:move}
+.node:focus-visible,.node.selected{outline:2px solid #176e7d;outline-offset:3px;z-index:2}
+.node.parked,.node.quarantined,.node.retired{opacity:.78;background:#fffaf2;border-left-color:#ce9b55}
+.node.needs-review,.node.blocked{border-left-color:#bc6872}
+.node .type{font-size:10px;color:#637b90;font-weight:800;text-transform:uppercase}
+.node .heading{font-size:12px;font-weight:700;line-height:1.3;max-height:34px;overflow:hidden;margin-top:4px}
+.node .foot{font-size:10px;color:#607488;margin-top:7px}
+#toolbar{position:absolute;top:12px;left:12px;display:flex;gap:6px;flex-wrap:wrap;background:#ffffffee;border:1px solid #dce4eb;border-radius:11px;padding:6px;z-index:5;max-width:calc(100% - 24px)}
+#toolbar button{padding:6px 9px}
+#hint{position:absolute;left:12px;bottom:12px;background:#ffffffed;border-radius:10px;padding:7px 11px;color:#64798d;pointer-events:none;max-width:60%;font-size:11px}
+#minimap{position:absolute;bottom:12px;right:12px;width:175px;height:125px;background:#fff;border:1px solid #b9ccda;border-radius:10px;box-shadow:0 4px 15px #203a4f1b;z-index:5;cursor:pointer}
+#inspector h3{border-bottom:1px solid #e9eff5;padding-bottom:6px}
+#inspector pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.5;background:#f4f7fb;border-radius:8px;padding:10px;max-height:220px;overflow:auto}
+#inspector .relation{padding:6px 0;border-bottom:1px solid #edf2f6;overflow-wrap:anywhere}
+#notice{font-size:11px;line-height:1.5;padding:10px;background:#ecf7f3;border-radius:8px;color:#28655f}
+#counts{margin:10px 0 4px;color:#546b7e;font-size:11px}
+#fileInput{display:none}
+@media(max-width:1050px){#app{grid-template-columns:205px minmax(0,1fr)}#inspector{position:absolute;right:0;top:54px;width:260px;bottom:0;z-index:8;box-shadow:-8px 0 20px #1e34471a}#workspace{grid-column:2} }
+@media(max-width:680px){#app{grid-template-columns:1fr;grid-template-rows:54px 180px minmax(0,1fr)}aside{grid-column:1;padding:9px;display:flex;gap:9px;overflow:auto}aside>div{min-width:170px}aside h2{display:none}#workspace{grid-column:1}#inspector{display:none}#toolbar{top:6px;left:6px}#hint{display:none}}
+</style></head>
+<body>
+<script type="application/json" id="rn-graph">__RN_GRAPH_JSON__</script>
+<script type="application/json" id="rn-views">__RN_VIEWS_JSON__</script>
+<div id="app">
+<header><strong>◈ Research Canvas</strong><small id="projectName">科研导航 · 画布只读数据</small><a href="../dashboard/index.html">返回经典工作台</a></header>
+<aside><div>
+<h2>研究探索</h2>
+<label for="view">视图</label><select id="view">
+<option value="all">探索 · All</option><option value="evidence">证据 · Evidence</option>
+<option value="routes">研究路线 · Routes</option><option value="outputs">成果 · Outputs</option>
+<option value="planning">当前规划 · Planning</option><option value="archive">归档探索 · Archive</option>
+</select>
+<label for="search">查找实体或 ID</label><input id="search" placeholder="输入关键词 / 节点 ID" type="search">
+<label for="module">研究模块</label><select id="module"><option value="">全部模块</option></select>
+<label for="lifecycle">生命周期</label><select id="lifecycle"><option value="">全部状态</option><option>active</option><option>parked</option><option>quarantined</option><option>retired</option><option>under-revival-review</option></select>
+<p id="counts"></p>
+</div><div>
+<h3>画布布局</h3>
+<label for="viewName">布局名称</label><input id="viewName" value="default" maxlength="80">
+<div class="row"><button id="saveLayout">保存布局</button><button id="loadLayout">恢复布局</button></div>
+<div class="row"><button id="exportLayout">导出 JSON</button><button id="importLayout">导入 JSON</button></div>
+<div class="row"><button id="resetLayout">重新布局</button><button id="exportSVG">导出 SVG</button></div>
+<input id="fileInput" type="file" accept=".json,application/json">
+<p class="info">布局只包含节点位置、视口、分组折叠信息；不包含科研状态或审批结果。离线保存于本浏览器，并可导出为 JSON 供本机 CLI 同步。</p>
+</div><div><div class="warn info">画布是研究状态的只读投影。拖动节点不会更改实验结论；论文证据、搁置/恢复和研究决策仍由状态引擎与人工审批管理。</div></div></aside>
+<section id="workspace" aria-label="无限研究画布，可按住空白处拖拽、滚轮缩放、使用键盘导航" tabindex="0">
+<div id="world"><svg id="edges" aria-hidden="true"></svg><div id="nodes"></div></div>
+<div id="toolbar"><button id="zoomIn" aria-label="放大">＋</button><button id="zoomOut" aria-label="缩小">－</button><button id="fit" class="primary">适应画布</button><button id="focus">定位节点</button><button id="unselect">取消选择</button><button id="collapse" title="折叠/展开节点邻居">折叠邻居</button></div>
+<svg id="minimap" viewBox="0 0 175 125" role="img" aria-label="节点概览迷你地图"></svg>
+<div id="hint">拖动空白处平移 · 滚轮缩放 · 拖动卡片仅改变布局 · 聚焦卡片后按方向键移动 · Enter 查看详情</div>
+</section>
+<aside id="inspector" aria-live="polite"><div><h2>节点详情</h2><div id="details" class="info">请选择画布中的研究节点。关联证据、实验状态与分支信息在此展示。</div></div><div><h3>视图与数据说明</h3><div id="notice">等待载入</div></div></aside>
+</div>
+<script>
+"use strict";
+(function(){
+const graph=JSON.parse(document.getElementById("rn-graph").textContent);
+const initialViews=JSON.parse(document.getElementById("rn-views").textContent);
+const byId=new Map(graph.nodes.map(n=>[n.id,n]));
+const allEdges=graph.edges;
+const $=id=>document.getElementById(id);
+const viewport=$("workspace"),world=$("world"),svg=$("edges"),cards=$("nodes"),minimap=$("minimap");
+const NS="http://www.w3.org/2000/svg", WIDTH=190, HEIGHT=94;
+const TYPES={
+  all:null,evidence:new Set(["Claim","Result","Source","EvidenceLink","Hypothesis","Milestone"]),
+  routes:new Set(["ResearchBranch","Milestone","ResearchQuestion","Idea","Hypothesis","Experiment","Result","Baseline","Task"]),
+  outputs:new Set(["Milestone","Claim","Artifact","Result","Decision","Source","EvidenceLink"])
+};
+const state={positions:{},camera:{x:210,y:180,z:1},selected:null,hidden:new Set(),drag:null,visible:new Set(),view:"all"};
+const snapshotKey="rn-canvas:"+graph.project_id+":views";
+const safeText=s=>String(s==null?"":s);
+function clamp(v,a,b){return Math.min(b,Math.max(a,v))}
+function defaultPositions(){
+  const sorted=graph.nodes.slice().sort((a,b)=>a.id.localeCompare(b.id));
+  const groups=new Map(); sorted.forEach(n=>{const key=n.module||"session";if(!groups.has(key))groups.set(key,[]);groups.get(key).push(n)});
+  let group=0;const out={};
+  for(const batch of groups.values()){
+    batch.forEach((n,i)=>{out[n.id]={x:group*300+(i%2)*215,y:Math.floor(i/2)*142}});
+    group++;
+  }
+  return out;
+}
+function validLayout(input){
+  if(!input||input.schema_version!=="canvas-layout-v1"||input.project_id!==graph.project_id)throw Error("布局项目 ID 或版本不匹配");
+  if(typeof input.positions!=="object"||!input.positions||Array.isArray(input.positions))throw Error("布局节点坐标无效");
+  const result={positions:{},camera:{x:210,y:180,z:1},collapsed:[]};
+  for(const [id,p] of Object.entries(input.positions)){
+    if(!byId.has(id))continue;
+    if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y)||Math.abs(p.x)>1e7||Math.abs(p.y)>1e7)throw Error("布局包含非法坐标");
+    result.positions[id]={x:p.x,y:p.y};
+  }
+  const c=input.viewport||{};
+  if(![c.x,c.y,c.z].every(Number.isFinite)||c.z<0.12||c.z>4.5||Math.abs(c.x)>1e7||Math.abs(c.y)>1e7)throw Error("视口数据非法");
+  result.camera={x:c.x,y:c.y,z:c.z};
+  if(Array.isArray(input.collapsed))result.collapsed=input.collapsed.filter(id=>byId.has(id));
+  return result;
+}
+function applyLayout(input){
+  const checked=validLayout(input),defaults=defaultPositions();
+  state.positions={...defaults,...checked.positions};
+  state.camera=checked.camera;
+  state.hidden=new Set(checked.collapsed);
+  render();
+}
+function currentLayout(name){
+  return {schema_version:"canvas-layout-v1",project_id:graph.project_id,
+    graph_revision:graph.project_revision,view_name:name||"default",
+    author:"local-browser",saved_at:new Date().toISOString(),
+    positions:state.positions,viewport:state.camera,collapsed:[...state.hidden].sort()};
+}
+function readSaved(){
+  try{return JSON.parse(localStorage.getItem(snapshotKey)||"{}")}catch{return {}}
+}
+function writeSaved(value){
+  try{localStorage.setItem(snapshotKey,JSON.stringify(value));return true}
+  catch{return false}
+}
+function chooseStartup(){
+  state.positions=defaultPositions();
+  const named=initialViews.views||{};
+  let layout=named.default;
+  const stored=readSaved();if(stored.default)layout=stored.default;
+  if(layout){try{applyLayout(layout);return}catch(e){$("notice").textContent="保存布局无效，已使用默认布局："+e.message}}
+  fitAll();
+}
+function visibleNodes(){
+  const view=$("view").value,needle=$("search").value.toLocaleLowerCase().trim(),
+        module=$("module").value,life=$("lifecycle").value;
+  let ids=graph.nodes.filter(n=>{
+    const status=n.statuses||{};
+    if(TYPES[view]&&!TYPES[view].has(n.type))return false;
+    if(view==="planning"&&!n.actionable)return false;
+    if(view==="archive"&&status.lifecycle_status==="active")return false;
+    if(view==="archive"&&n.kind!=="item")return false;
+    if(module&&n.module!==module)return false;
+    if(life&&status.lifecycle_status!==life)return false;
+    if(needle&&!(n.label+" "+n.entity_id+" "+n.type).toLocaleLowerCase().includes(needle))return false;
+    return !state.hidden.has(n.id);
+  }).map(n=>n.id);
+  state.visible=new Set(ids);
+  return ids;
+}
+function nodeColor(n){
+  const st=n.statuses||{};
+  if(st.lifecycle_status&&st.lifecycle_status!=="active")return "#c89355";
+  if(st.impact_status==="needs-review"||st.impact_status==="blocked")return "#d47a85";
+  if(n.type==="Milestone")return "#667bd5";
+  if(n.type==="ResearchBranch")return "#159889";
+  if(n.type==="EvidenceLink"||n.type==="Claim")return "#9866ba";
+  if(n.type==="SessionRef")return "#7f8a9a";
+  return "#4a8b9a";
+}
+function makeSvg(tag,attrs){const el=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));return el}
+function render(){
+  const visible=visibleNodes();world.style.transform="translate("+state.camera.x+"px,"+state.camera.y+"px) scale("+state.camera.z+")";
+  cards.replaceChildren();svg.replaceChildren();
+  const active=state.visible;
+  for(const e of allEdges){
+    if(!active.has(e.from)||!active.has(e.to))continue;
+    const from=state.positions[e.from],to=state.positions[e.to];if(!from||!to)continue;
+    const line=makeSvg("line",{x1:from.x+WIDTH/2,y1:from.y+HEIGHT/2,x2:to.x+WIDTH/2,y2:to.y+HEIGHT/2,stroke:e.type==="contradicts"?"#c66a80":"#98aabd","stroke-width":1.7,"stroke-dasharray":e.type==="depends-on"?"5 4":"none"});
+    svg.appendChild(line);
+  }
+  for(const id of visible){
+    const n=byId.get(id),p=state.positions[id];if(!p)continue;
+    const el=document.createElement("button");el.className="node";
+    el.type="button";el.dataset.node=id;
+    el.setAttribute("aria-label",n.type+" "+n.entity_id+" "+n.label);
+    el.style.transform="translate("+p.x+"px,"+p.y+"px)";
+    el.style.borderLeftColor=nodeColor(n);
+    const st=n.statuses||{};
+    if(st.lifecycle_status&&st.lifecycle_status!=="active")el.classList.add(st.lifecycle_status);
+    if(st.impact_status&&st.impact_status!=="current")el.classList.add(st.impact_status);
+    if(state.selected===id)el.classList.add("selected");
+    for(const [cls,content] of [["type",n.type+" · "+n.entity_id],["heading",n.label],["foot",[st.lifecycle_status,st.impact_status].filter(Boolean).join(" / ")||"参考记录"]]){
+      const child=document.createElement("div");child.className=cls;child.textContent=safeText(content);el.appendChild(child);
+    }
+    el.addEventListener("pointerdown",ev=>startNodeDrag(ev,id));
+    el.addEventListener("keydown",ev=>nodeKey(ev,id));
+    el.addEventListener("click",()=>selectNode(id));
+    cards.appendChild(el);
+  }
+  $("counts").textContent=visible.length+" / "+graph.nodes.length+" 节点 · "+
+    allEdges.filter(e=>active.has(e.from)&&active.has(e.to)).length+" 条连线";
+  renderMini();
+}
+function selectNode(id){
+  state.selected=id;
+  render();
+  const node=byId.get(id);if(!node)return;
+  const related=allEdges.filter(e=>e.from===id||e.to===id);
+  const box=$("details");box.replaceChildren();
+  function section(title,content){
+    const h=document.createElement("h3");h.textContent=title;box.appendChild(h);
+    const pre=document.createElement("pre");pre.textContent=content;box.appendChild(pre);
+  }
+  section(node.type+" · "+node.entity_id,node.label);
+  section("状态（来自权威研究记录）",JSON.stringify(node.statuses||{},null,2));
+  section("研究与证据信息",JSON.stringify(node.metadata||{},null,2));
+  section("相关关系",related.length?related.map(e=>e.from+" —"+e.type+"→ "+e.to+
+    " ("+e.provenance.collection+")").join("\n"):"暂无");
+  const stamp=document.createElement("div");stamp.className="info";
+  stamp.textContent="节点修订 "+safeText(node.revision)+" · 操作不修改研究状态";box.appendChild(stamp);
+}
+function startNodeDrag(ev,id){
+  if(ev.button!==0)return;
+  ev.stopPropagation();
+  state.drag={kind:"node",id,startX:ev.clientX,startY:ev.clientY,
+    ox:state.positions[id].x,oy:state.positions[id].y,moved:false};
+  ev.currentTarget.setPointerCapture(ev.pointerId);
+  selectNode(id);
+}
+function nodeKey(ev,id){
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(ev.key)){
+    ev.preventDefault();
+    const d=ev.shiftKey?35:10;
+    state.positions[id].x+=(ev.key==="ArrowLeft"?-d:ev.key==="ArrowRight"?d:0);
+    state.positions[id].y+=(ev.key==="ArrowUp"?-d:ev.key==="ArrowDown"?d:0);
+    render();
+    const node=cards.querySelector('[data-node="'+id+'"]');if(node)node.focus();
+  }else if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();selectNode(id)}
+}
+viewport.addEventListener("pointerdown",ev=>{
+  if(ev.button!==0||ev.target.closest(".node")||ev.target.closest("#toolbar")||ev.target.closest("#minimap"))return;
+  state.drag={kind:"pan",startX:ev.clientX,startY:ev.clientY,
+    ox:state.camera.x,oy:state.camera.y};
+  viewport.setPointerCapture(ev.pointerId);viewport.classList.add("dragging");
+});
+viewport.addEventListener("pointermove",ev=>{
+  if(!state.drag)return;
+  const d=state.drag,dx=ev.clientX-d.startX,dy=ev.clientY-d.startY;
+  if(d.kind==="pan"){
+    state.camera.x=d.ox+dx;state.camera.y=d.oy+dy;
+  }else{
+    const p=state.positions[d.id];p.x=d.ox+dx/state.camera.z;p.y=d.oy+dy/state.camera.z;
+    if(Math.abs(dx)+Math.abs(dy)>3)d.moved=true;
+  }
+  render();
+});
+function release(){state.drag=null;viewport.classList.remove("dragging")}
+viewport.addEventListener("pointerup",release);viewport.addEventListener("pointercancel",release);
+function zoomAt(factor,px,py){
+  const old=state.camera.z,newZ=clamp(old*factor,.12,4.5),ratio=newZ/old;
+  state.camera.x=px-(px-state.camera.x)*ratio;
+  state.camera.y=py-(py-state.camera.y)*ratio;
+  state.camera.z=newZ;render();
+}
+viewport.addEventListener("wheel",ev=>{
+  ev.preventDefault();const r=viewport.getBoundingClientRect();
+  zoomAt(Math.exp(-ev.deltaY*.0012),ev.clientX-r.left,ev.clientY-r.top);
+},{passive:false});
+function fitAll(){
+  const ids=visibleNodes();if(!ids.length){state.camera={x:90,y:100,z:1};render();return}
+  const xs=ids.map(id=>state.positions[id].x),ys=ids.map(id=>state.positions[id].y);
+  const minx=Math.min(...xs),miny=Math.min(...ys),maxx=Math.max(...xs)+WIDTH,maxy=Math.max(...ys)+HEIGHT;
+  const rect=viewport.getBoundingClientRect();
+  const z=clamp(Math.min((rect.width-80)/Math.max(1,maxx-minx),(rect.height-120)/Math.max(1,maxy-miny)),.12,1.5);
+  state.camera={z,x:(rect.width-(maxx-minx)*z)/2-minx*z,y:(rect.height-(maxy-miny)*z)/2-miny*z};
+  render();
+}
+function focusSelected(){
+  if(!state.selected){$("notice").textContent="先选择一个研究节点";return}
+  const p=state.positions[state.selected],r=viewport.getBoundingClientRect();
+  state.camera.x=r.width/2-(p.x+WIDTH/2)*state.camera.z;
+  state.camera.y=r.height/2-(p.y+HEIGHT/2)*state.camera.z;render();
+}
+function renderMini(){
+  minimap.replaceChildren();
+  const ids=[...state.visible];if(!ids.length)return;
+  const pos=ids.map(id=>state.positions[id]);if(pos.some(p=>!p))return;
+  const minx=Math.min(...pos.map(p=>p.x)),maxx=Math.max(...pos.map(p=>p.x))+WIDTH,
+        miny=Math.min(...pos.map(p=>p.y)),maxy=Math.max(...pos.map(p=>p.y))+HEIGHT;
+  const zoom=Math.min(165/Math.max(1,maxx-minx),115/Math.max(1,maxy-miny));
+  for(const id of ids){
+    const p=state.positions[id],n=byId.get(id);
+    minimap.appendChild(makeSvg("rect",{x:5+(p.x-minx)*zoom,y:5+(p.y-miny)*zoom,
+      width:Math.max(3,WIDTH*zoom),height:Math.max(3,HEIGHT*zoom),rx:2,
+      fill:nodeColor(n),opacity:id===state.selected?1:.7}));
+  }
+  const r=viewport.getBoundingClientRect(),wx=-state.camera.x/state.camera.z,
+    wy=-state.camera.y/state.camera.z;
+  minimap.appendChild(makeSvg("rect",{x:5+(wx-minx)*zoom,y:5+(wy-miny)*zoom,
+    width:r.width/state.camera.z*zoom,height:r.height/state.camera.z*zoom,
+    fill:"none",stroke:"#132d46","stroke-width":1.3,"stroke-dasharray":"3 2"}));
+  minimap.onclick=ev=>{
+    const p=minimap.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;
+    const transform=minimap.getScreenCTM();if(!transform)return;
+    const local=p.matrixTransform(transform.inverse());
+    const x=(local.x-5)/zoom+minx,y=(local.y-5)/zoom+miny;
+    state.camera.x=r.width/2-x*state.camera.z;
+    state.camera.y=r.height/2-y*state.camera.z;render();
+  };
+}
+function exportText(name,data,type){
+  const blob=new Blob([data],{type}),url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+function notice(message){$("notice").textContent=message}
+function saveLayout(){
+  const name=$("viewName").value.trim()||"default",all=readSaved();
+  all[name]=currentLayout(name);
+  const ok=writeSaved(all);
+  notice(ok?"布局已保存在此浏览器（不修改科研数据）；也可导出 JSON。":"浏览器存储不可用，请导出布局 JSON。");
+}
+function loadLayout(){
+  const name=$("viewName").value.trim()||"default";
+  const all=readSaved();
+  const target=all[name]||(initialViews.views||{})[name];
+  if(!target){notice("未找到布局 "+name);return}
+  try{applyLayout(target);notice("已恢复布局 "+name)}catch(e){notice("布局导入失败："+e.message)}
+}
+function exportLayout(){
+  const name=$("viewName").value.trim()||"default";
+  exportText("research-layout-"+name+".json",JSON.stringify(currentLayout(name),null,2),"application/json");
+}
+function importLayout(file){
+  if(!file)return;
+  if(file.size>2e6){notice("布局文件超过 2 MB，拒绝导入");return}
+  file.text().then(text=>{
+    const imported=JSON.parse(text);applyLayout(imported);
+    notice("已导入布局（仅视图）；点击保存可记入当前浏览器");
+  }).catch(e=>notice("导入失败："+e.message));
+}
+function exportSvg(){
+  const ids=[...state.visible];if(!ids.length)return;
+  const positions=ids.map(id=>state.positions[id]);
+  const minx=Math.min(...positions.map(p=>p.x))-25,miny=Math.min(...positions.map(p=>p.y))-25;
+  const maxx=Math.max(...positions.map(p=>p.x))+WIDTH+25,maxy=Math.max(...positions.map(p=>p.y))+HEIGHT+25;
+  const out=makeSvg("svg",{xmlns:NS,viewBox:[minx,miny,maxx-minx,maxy-miny].join(" "),
+    width:maxx-minx,height:maxy-miny});
+  out.appendChild(makeSvg("rect",{x:minx,y:miny,width:maxx-minx,height:maxy-miny,fill:"#f4f7fb"}));
+  for(const e of allEdges){
+    if(!state.visible.has(e.from)||!state.visible.has(e.to))continue;
+    const a=state.positions[e.from],b=state.positions[e.to];
+    out.appendChild(makeSvg("line",{x1:a.x+WIDTH/2,y1:a.y+HEIGHT/2,
+      x2:b.x+WIDTH/2,y2:b.y+HEIGHT/2,stroke:"#98aabd","stroke-width":2}));
+  }
+  for(const id of ids){
+    const p=state.positions[id],n=byId.get(id);
+    out.appendChild(makeSvg("rect",{x:p.x,y:p.y,width:WIDTH,height:HEIGHT,rx:10,
+      fill:"#fff",stroke:nodeColor(n),"stroke-width":2}));
+    const title=makeSvg("text",{x:p.x+10,y:p.y+24,fill:"#25435b","font-size":11});
+    title.textContent=n.type+" · "+n.entity_id;out.appendChild(title);
+    const label=makeSvg("text",{x:p.x+10,y:p.y+45,fill:"#16283e","font-size":12});
+    label.textContent=n.label.length>23?n.label.slice(0,22)+"…":n.label;out.appendChild(label);
+  }
+  const title=makeSvg("title",{});title.textContent="Research Canvas read-only, project revision "+graph.project_revision;
+  out.insertBefore(title,out.firstChild);
+  exportText("research-canvas-revision-"+graph.project_revision+".svg",
+    new XMLSerializer().serializeToString(out),"image/svg+xml");
+}
+for(const button of ["view","module","lifecycle"])$(button).addEventListener("change",()=>{render();fitAll()});
+$("search").addEventListener("input",render);
+$("zoomIn").onclick=()=>zoomAt(1.2,viewport.clientWidth/2,viewport.clientHeight/2);
+$("zoomOut").onclick=()=>zoomAt(1/1.2,viewport.clientWidth/2,viewport.clientHeight/2);
+$("fit").onclick=fitAll;$("focus").onclick=focusSelected;
+$("unselect").onclick=()=>{state.selected=null;$("details").textContent="请选择一个节点";render()};
+$("collapse").onclick=()=>{
+  if(!state.selected){notice("先选择节点，再折叠或展开直接邻居");return}
+  const neighbors=new Set();
+  allEdges.forEach(e=>{
+    if(e.from===state.selected)neighbors.add(e.to);
+    if(e.to===state.selected)neighbors.add(e.from);
+  });
+  const hide=[...neighbors].some(id=>!state.hidden.has(id));
+  neighbors.forEach(id=>{if(hide)state.hidden.add(id);else state.hidden.delete(id)});
+  render();
+};
+$("saveLayout").onclick=saveLayout;$("loadLayout").onclick=loadLayout;
+$("exportLayout").onclick=exportLayout;$("importLayout").onclick=()=>$("fileInput").click();
+$("fileInput").onchange=ev=>importLayout(ev.target.files[0]);
+$("resetLayout").onclick=()=>{state.positions=defaultPositions();state.hidden.clear();fitAll();notice("已重置布局（尚未保存）")};
+$("exportSVG").onclick=exportSvg;
+viewport.addEventListener("keydown",ev=>{
+  if(ev.target!==viewport)return;
+  if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(ev.key)){
+    ev.preventDefault();const d=ev.shiftKey?80:35;
+    state.camera.x+=ev.key==="ArrowLeft"?d:ev.key==="ArrowRight"?-d:0;
+    state.camera.y+=ev.key==="ArrowUp"?d:ev.key==="ArrowDown"?-d:0;render();
+  }
+  if(ev.key==="+"||ev.key==="="){ev.preventDefault();zoomAt(1.15,viewport.clientWidth/2,viewport.clientHeight/2)}
+  if(ev.key==="-"){ev.preventDefault();zoomAt(1/1.15,viewport.clientWidth/2,viewport.clientHeight/2)}
+});
+["topic","literature","experiment","pivot","synthesis"].forEach(mod=>{
+  const o=document.createElement("option");o.value=mod;o.textContent=mod;$("module").appendChild(o);
+});
+$("projectName").textContent="项目 "+graph.project_id.slice(0,8)+" · 修订 "+graph.project_revision+" · "+graph.nodes.length+" 节点";
+notice("离线只读 · 科研节点状态来自修订 "+graph.project_revision+" · 自由拖拽只更改布局");
+chooseStartup();
+})();
+</script>
+</body></html>
