@@ -228,17 +228,6 @@ def create_handler(root, token, port):
     return Handler
 
 
-def run_server(root, port=0):
-    # Use IPv4 loopback only. No user-controlled host.
-    from pathlib import Path
-    root = Path(root).expanduser().resolve(strict=True)
-    state_view(root)  # validate before binding to any TCP port
-    token = secrets.token_urlsafe(32)
-    with ThreadingHTTPServer(("127.0.0.1",port), create_handler(root,token,port)) as server:
-        # A bound ephemeral port requires handler closure to know the actual port.
-        pass
-
-
 def serve(root, port=0):
     from pathlib import Path
     root = Path(root).expanduser().resolve(strict=True)
