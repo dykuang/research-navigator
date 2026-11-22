@@ -232,11 +232,11 @@ def validate_evidence_level(state, epistemic, refs, observation="", artifact="")
     if epistemic=="experimentally-supported" and not (observation.strip() and artifact.strip()):
         raise ResearchError("experimentally-supported 需要实际实验观察与工件路径；用户确认不能代替实验")
 
-def add_item(root, **kwargs):
+def add_item(root, *, expected_revision=None, proposal_id=None, **kwargs):
     with workspace_lock(root):
         state=load(root)
         item=new_item(state,**kwargs)
-        write(root,state,[{"action":"item-created","actor":kwargs.get("actor","agent"),"item_id":item["id"],"reason":"new research item","after":copy.deepcopy(item)}])
+        write(root,state,[{"action":"item-created","actor":kwargs.get("actor","agent"),"item_id":item["id"],"reason":"new research item","after":copy.deepcopy(item),"proposal_id":proposal_id}],expected_revision=expected_revision)
         return item
 
 def add_source(root, title, actor="agent", url="", doi="", authors="", year="", access_level="unavailable", verification_status="unverified", verification_note="", locator="", summary=""):
@@ -256,7 +256,7 @@ def add_source(root, title, actor="agent", url="", doi="", authors="", year="", 
         write(root,s,[{"action":"source-added","actor":actor,"item_id":row["id"],"reason":"source catalogued; bibliographic accuracy not independently guaranteed","after":row}])
         return row
 
-def add_relation(root, source, target, relation, actor="agent", reason=""):
+def add_relation(root, source, target, relation, actor="agent", reason="", *, expected_revision=None, proposal_id=None):
     require(relation,RELATIONS,"relation"); require(actor,ACTORS,"actor")
     with workspace_lock(root):
         s=load(root)
@@ -270,7 +270,7 @@ def add_relation(root, source, target, relation, actor="agent", reason=""):
         if relation=="contributes-to" and item_by_id(s,target)["type"]!="Milestone":
             raise ResearchError("contributes-to must target Milestone")
         if relation=="depends-on": item_by_id(s,source)["depends_on"].append(target)
-        events=[{"action":"relation-added","actor":actor,"item_id":source,"reason":reason or "explicit relation","after":row}]
+        events=[{"action":"relation-added","actor":actor,"item_id":source,"reason":reason or "explicit relation","after":row,"proposal_id":proposal_id}]
         if relation in ("contradicts","blocks"):
             affected=item_by_id(s,target)
             before=affected["impact_status"]
@@ -278,7 +278,7 @@ def add_relation(root, source, target, relation, actor="agent", reason=""):
             affected["revision"]+=1;affected["updated_at"]=now()
             events.append({"action":"impact-propagated","actor":actor,"item_id":target,"reason":f"incoming {relation} relation from {source}","before":{"impact_status":before},"after":{"impact_status":affected["impact_status"]}})
             events+=propagate(s,target,actor,f"upstream {relation} {source}",block=(relation=="blocks"))
-        write(root,s,events)
+        write(root,s,events,expected_revision=expected_revision)
         return row
 
 def dependents(state, ident):
@@ -309,7 +309,7 @@ def propagate(state, ident, actor, reason, block=False):
                 events.append({"action":"impact-propagated","actor":actor,"item_id":did,"reason":f"{reason}; upstream={ident}","before":{"impact_status":old},"after":{"impact_status":item["impact_status"]}})
     return events
 
-def change_status(root, ident, field, value, reason, actor="agent", evidence_refs=None, completion_note="", failure_category="unknown", failure_scope="", confidence="uncertain", revival_triggers="", lesson="", cost="", revival_question="", new_conditions=""):
+def change_status(root, ident, field, value, reason, actor="agent", evidence_refs=None, completion_note="", failure_category="unknown", failure_scope="", confidence="uncertain", revival_triggers="", lesson="", cost="", revival_question="", new_conditions="", *, expected_revision=None, proposal_id=None):
     fields={"workflow_status":WORKFLOW,"epistemic_status":EPISTEMIC,"review_status":REVIEW,"outcome":OUTCOME,"lifecycle_status":LIFECYCLE,"impact_status":IMPACT}
     if field not in fields: raise ResearchError("不可修改的字段")
     require(value,fields[field],field); require(actor,ACTORS,"actor")
@@ -352,13 +352,13 @@ def change_status(root, ident, field, value, reason, actor="agent", evidence_ref
             if old=="under-revival-review" and value in ARCHIVED:
                 obj["revival"] = None
         obj[field]=value; obj["revision"]+=1; obj["updated_at"]=now()
-        events.append({"action":"status-changed","actor":actor,"item_id":ident,"reason":reason,"evidence_refs":evidence_refs or [],"before":{field:old},"after":{field:value}})
+        events.append({"action":"status-changed","actor":actor,"item_id":ident,"reason":reason,"evidence_refs":evidence_refs or [],"before":{field:old},"after":{field:value},"proposal_id":proposal_id})
         if field in ("epistemic_status","lifecycle_status","outcome"):
             events+=propagate(s,ident,actor,reason,block=(field=="lifecycle_status" and value in ("quarantined","retired")))
-        write(root,s,events)
+        write(root,s,events,expected_revision=expected_revision)
         return obj,events
 
-def revive(root, ident, title, reason, approval_note, new_conditions, actor="user"):
+def revive(root, ident, title, reason, approval_note, new_conditions, actor="user", *, expected_revision=None, proposal_id=None):
     if actor not in ("user","mentor") or not approval_note.strip():raise ResearchError("新候选回收需要明确用户/导师批准说明")
     if not reason.strip() or not new_conditions.strip():raise ResearchError("回收需说明变化、风险和新的测试条件")
     with workspace_lock(root):
@@ -371,7 +371,7 @@ def revive(root, ident, title, reason, approval_note, new_conditions, actor="use
         old["lifecycle_status"]=previous
         old["revival"]=None
         old["updated_at"]=now();old["revision"]+=1
-        write(root,s,[{"action":"revival-candidate-created","actor":actor,"item_id":candidate["id"],"reason":reason,"approval":approval_note,"before":{"parent_id":ident,"parent_lifecycle":"under-revival-review"},"after":{"candidate_id":candidate["id"],"parent_lifecycle":previous,"new_conditions":new_conditions}}])
+        write(root,s,[{"action":"revival-candidate-created","actor":actor,"item_id":candidate["id"],"reason":reason,"approval":approval_note,"before":{"parent_id":ident,"parent_lifecycle":"under-revival-review"},"after":{"candidate_id":candidate["id"],"parent_lifecycle":previous,"new_conditions":new_conditions},"proposal_id":proposal_id}],expected_revision=expected_revision)
         return candidate
 
 def set_project(root, focus_module=None, research_question=None, next_decision=None, actor="user", reason=""):
