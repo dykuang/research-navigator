@@ -74,3 +74,24 @@ Unit tests verify 100+ nodes, deterministic edge provenance, XSS-safe embedded J
 ## Scope limits
 
 No freehand drawing, real-time collaboration, automatic chat import, graph semantics editing, browser proposals or direct Codex session navigation are included in #7–#9. Those are later roadmap tasks. On projects with very large graphs, the CLI supports pagination and focus queries; the single-file canvas currently embeds the whole graph and is best for projects within normal browser memory.
+
+## #10 — Semantic proposals on a connected local Canvas
+
+To create or edit **research meaning**, do not open the static `research/canvas/index.html` snapshot as an editor. Instead start `python scripts/local_editor.py serve PROJECT_ROOT`, open the private printed capability URL and select **Open interactive Research Canvas**. The connected Canvas fetches live graph nodes via protected localhost `/api/graph`, never trusting a stale HTML snapshot as canonical state. The capability remains within the current browser tab's sessionStorage so a same-tab reload can reconnect; do not share or forward the link.
+
+In the right-side `科研语义提案` inspector, choose an operation, edit its JSON parameters, provide a meaningful reason and use **模拟影响（不写入）** to inspect the before/after diff and downstream impacts. You can fill IDs from the selected node. Operations include Idea/Hypothesis/Task, ResearchBranch creation, scientific Milestone creation, typed relation addition/removal, milestone criteria, evidence attachment and scoped Claim–Evidence links.
+
+After successful preview, **提交待审批** creates a proposal (not a canonical research write). In a separate interactive terminal run:
+
+~~~bash
+python scripts/local_editor.py inspect PROJECT_ROOT PROPOSAL_ID
+python scripts/local_editor.py approve PROJECT_ROOT PROPOSAL_ID
+# or reject:
+python scripts/local_editor.py reject PROJECT_ROOT PROPOSAL_ID
+~~~
+
+The terminal displays a fresh change preview and requires the exact `APPROVE PROPOSAL_ID` phrase. The project revision is rechecked under a lock; errors, conflicting edits or stale proposals fail without canonical writes. Click **刷新状态** to fetch committed nodes and the changed proposal status. A successful browser HTTP 202 is always **pending**, never approval. For an offline Canvas, use **导出草案 JSON** to preserve parameters only.
+
+Archived branches are not eligible for direct modification, revival links or positive planning. Accepted Milestone conditions require a new formal review; evidence metadata does not validate a scientific claim, and an Agent cannot authenticate a mentor by choosing an actor label. Browser proposals cannot launch experiments or create expensive tasks without a subsequent separate execution decision.
+
+See [local Bridge security](local-bridge-security.md) for the detailed permission and threat model.
