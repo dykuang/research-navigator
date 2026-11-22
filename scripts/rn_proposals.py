@@ -80,8 +80,10 @@ def validate_proposal(root, payload):
         # decisions; these remain in the main Agent/CLI domain workflow.
         if args["field"] not in ("workflow_status", "outcome"):
             raise ResearchError("lifecycle, evidence, review and impact changes need main Agent workflow")
-        if args["field"] == "workflow_status" and args["value"] in ("done", "no-further-considered"):
-            raise ResearchError("completion/retirement require dedicated approval and evidence")
+        if args["field"] == "workflow_status" and args["value"] not in (
+            "to-be-determined", "ready-for-agent", "to-be-implemented", "in-progress"
+        ):
+            raise ResearchError("blocking, completion and retirement require main Agent workflow")
     return {"operation": op, "params": args, "reason": reason.strip(), "expected_revision": rev}
 
 
@@ -140,6 +142,8 @@ def approve_proposal(root, proposal_id, *, confirmed=False):
     # The proposal is only marked applied after a successful canonical write.
     path, p = _open_proposal(root, proposal_id)
     clean = validate_proposal(root, {k:p[k] for k in ("operation","params","reason","expected_revision")})
+    if p.get("id") != proposal_id:
+        raise ResearchError("proposal file identifier mismatch")
     if p.get("status") != "pending":
         raise ResearchError("proposal already processed")
     with workspace_lock(root):
@@ -216,3 +220,20 @@ def approve_proposal(root, proposal_id, *, confirmed=False):
         atomic_json(path, live)
         return {"status":"applied","result":result,
                 "revision":state["project"]["revision"]}
+
+
+def reject_proposal(root, proposal_id, *, confirmed=False):
+    """Local terminal rejection does not modify canonical research state."""
+    if not confirmed:
+        raise ResearchError("rejection requires explicit terminal confirmation")
+    from rn_core import atomic_json
+    with workspace_lock(root):
+        path, row = _open_proposal(root, proposal_id)
+        if row.get("status") != "pending" or row.get("id") != proposal_id:
+            raise ResearchError("proposal already processed or tampered")
+        if row.get("project_id") != load(root)["project"]["project_id"]:
+            raise ResearchError("wrong project")
+        row["status"] = "rejected"
+        row["rejected_at"] = now()
+        atomic_json(path,row)
+        return {"proposal_id":proposal_id,"status":"rejected"}
