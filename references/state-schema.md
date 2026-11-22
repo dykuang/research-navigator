@@ -1,6 +1,6 @@
-# State and schema contract (v0.1)
+# State and schema contract (v0.2; backward-compatible legacy read)
 
-`research/state/` has `project.json`, `items.json`, `relations.json`, `sources.json`, and append-only `events.jsonl`. All files are UTF-8. **No shared skill-level student data.** A project lives entirely at the user-given project root.
+`research/state/` retains `project.json`, `items.json`, `relations.json`, `sources.json`, and append-only `events.jsonl`; v0.2 adds `session_refs.json` and `evidence_links.json`. All files are UTF-8. **No shared skill-level student data.** A project lives entirely at the user-given project root.
 
 ## Entity contract
 
@@ -19,3 +19,29 @@ Status dimensions are **orthogonal**. Workflow: `to-be-determined`, `ready-for-a
 ## Events
 
 JSONL events record UTC time, random event ID, action, actor, changed ID, reason, old/new values. The log is appended to; application state is stored in JSON. The engine uses an OS advisory lock and atomically replaces individual JSON files. This is not a crash-safe cross-file database transaction nor tamper-evident audit log; keep the project under Git/versioned backups for stronger durability.
+
+## v0.2 additive domain and migration (#2–#5)
+
+`schema_version=0.2.0` is used for new projects. `0.1.0` remains read-only until explicit migration with `python scripts/migrate_state.py preview|apply PROJECT_ROOT`. A legacy project lacking new sidecars loads as empty arrays; it is never silently upgraded during planning. Applying migration creates a verified ZIP backup under `research/backups/`, checks validity, records one `schema-migrated` event, and increments project revision once. A second apply is a no-op without new events or backups. Original item IDs, statuses, evidence, archive history and event content are preserved.
+
+**Transaction and concurrency guarantee:** write operations hold an advisory project lock and require current project revision to match the in-memory revision; `write(..., expected_revision=N)` optionally checks a caller-supplied optimistic version. A pre-write `pending-transaction.json` undo journal holds exact prior file text including the event log. Interrupted or partially written data is **blocked for reads** until explicit `python scripts/migrate_state.py recover PROJECT_ROOT`. Recovery rolls back to pre-write bytes. This is a crash-recoverable single-process/local filesystem design, **not** a multi-host ACID database or cryptographically immutable audit log. Restore a backup from Git/ZIP if filesystem storage itself is damaged. External integrations must not bypass the state engine or write JSON directly.
+
+New entities in the existing `items.json`:
+- `ResearchBranch` (prefix `BR-`): same orthogonal statuses as other research items plus `branch.goal` and nonempty `branch.stop_conditions[]`; never equate Git branches and research routes.
+- `Milestone` (prefix `MILE-`): `milestone.criteria[]` entries with stable criterion ID, scientific description, linked evidence IDs; `accepted`, `approval_note`. Scientific completion requires linked evidence for every criterion and explicit human sign-off. Approval does not upgrade epistemic truth.
+- Explicit graph relation `X member-of BR-xxxx` assigns a research item to one or more branches, without copying shared sources/Baselines. `X contributes-to MILE-xxxx` associates a branch or scientific item with a milestone. These link targets are structurally validated, and upstream changes flag downstream review.
+
+`evidence_links.json = {"evidence_links": [...]}`:
+- stable `EVL-xxxx`, `claim_id` (must be a Claim), `evidence_id` (known source/item), `stance` (`supports|contradicts|qualifies`), `quality` (`unverified|source-checked|experiment-observed`), `scope` (required), `locator` (paper section or artifact location), `note`, `created_at`, `recorded_by`.
+- `source-checked` is valid only for an actually marked primary-inspected source, not an abstract. `experiment-observed` requires Result with an observation and artifact path. These are metadata safeguards, *not automatic source verification*. Contradiction marks a related Claim and downstream dependents for review, never auto-adjusts scientific truth.
+
+`session_refs.json = {"session_refs": [...]}`:
+- stable `SESS-xxxx`, `provider` (`codex|chatgpt|other`), `workspace_id`, `session_id`, optional HTTPS `url`, `url_verified=false`, `entity_ids[]` and per-entity `roles{}`, recording actor/time.
+- Many-to-many association: an Agent Session may link to multiple research IDs and vice versa. No chat text is copied. URL acceptance is not verification of provider support; UI must not open it automatically unless an actual provider adapter verifies it. Unsafe URL shapes are rejected.
+- Unlinking a SessionRef association preserves both the research entity and the historical SessionRef registration.
+
+### Local interface / roadmap boundaries
+
+CLI: `scripts/v02_project.py` for research Branch, Milestone, EvidenceLink and SessionRef actions. Existing `scripts/update_project.py` remains in place. Canvas (#7 onward) and secure localhost writeback (#6) are **not** implemented by these domain-model changes; static dashboard remains read-only. See `references/v02-operations.md` for documented commands and safe usage.
+
+**Backups and recovery:** after `preview`, run `apply`; retain generated ZIP and project Git history. If reads report a pending transaction, stop all other tools and run `recover` with the project root. Do not delete journal manually or run edits concurrently from several machines.
