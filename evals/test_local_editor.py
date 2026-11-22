@@ -111,9 +111,8 @@ class ProposalSecurityTests(unittest.TestCase):
         original=load(self.root)
         p=self.proposal(op="set-status",params={"item_id":idea["id"],
                           "field":"outcome","value":"positive"})
-        ref=queue_proposal(self.root,p)["proposal_id"]
         with self.assertRaisesRegex(ResearchError,"archived"):
-            approve_proposal(self.root,ref,confirmed=True)
+            queue_proposal(self.root,p)
         self.assertEqual(load(self.root),original)
 
     def test_scientific_result_outcome_requires_primary_workflow(self):
@@ -121,10 +120,9 @@ class ProposalSecurityTests(unittest.TestCase):
                         module="experiment",observation="Toy observation",
                         artifact_path="synthetic-result.log")
         before=load(self.root)
-        ref=queue_proposal(self.root,self.proposal(op="set-status",
-            params={"item_id":result["id"],"field":"outcome","value":"positive"}))["proposal_id"]
         with self.assertRaisesRegex(ResearchError,"scientific result"):
-            approve_proposal(self.root,ref,confirmed=True)
+            queue_proposal(self.root,self.proposal(op="set-status",
+                params={"item_id":result["id"],"field":"outcome","value":"positive"}))
         self.assertEqual(load(self.root),before)
 
     def test_valid_status_and_relation_gated_by_terminal(self):
@@ -143,11 +141,9 @@ class ProposalSecurityTests(unittest.TestCase):
         before=load(self.root)
         p=self.proposal(op="add-relation",params={"source":idea["id"],
                          "target":"IDEA-9999","relation":"depends-on"})
-        ref=queue_proposal(self.root,p)["proposal_id"]
         with self.assertRaises(ResearchError):
-            approve_proposal(self.root,ref,confirmed=True)
+            queue_proposal(self.root,p)
         self.assertEqual(before,load(self.root))
-        self.assertEqual(inspect_proposal(self.root,ref)["status"],"pending")
 
     def test_terminal_noninteractive_refused(self):
         cli=Path(__file__).resolve().parents[1] / "scripts" / "local_editor.py"
