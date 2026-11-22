@@ -50,7 +50,7 @@ def main():
     expect(page.locator("#sessionRecords")).not_to_contain_text("chatgpt-session-def")
     expect(page.locator("#sessionRecords")).to_contain_text("decision")
     page.locator("#semanticOperation").select_option("link-session")
-    expect(page.locator("#semanticParams")).to_contain_text("session_ref_id")
+    expect(page.locator("#semanticParams")).to_have_value(__import__("re").compile("session_ref_id"))
     assert not errors,errors
     assert load(root)==before
     browser.close()
