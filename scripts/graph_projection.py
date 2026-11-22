@@ -37,6 +37,9 @@ def _item_node(item):
         "owner": item.get("owner", ""),
         "next_action": item.get("next_action", ""),
         "acceptance_criteria": item.get("acceptance_criteria", ""),
+        "archive": item.get("archive"),
+        "archive_history": item.get("archive_history", []),
+        "revival": item.get("revival"),
         "archive_reason": (item.get("archive") or {}).get("reason", ""),
         "archive_scope": (item.get("archive") or {}).get("failure_scope", ""),
         "revival_triggers": (item.get("archive") or {}).get("revival_triggers", ""),
@@ -83,8 +86,21 @@ def _nodes_edges(state):
                           "collection": origin, "key": locator}}
         return eid
 
+    # Bounded decision trail, preserving each canonical event without mutating it.
+    history = {}
+    for event in state.get("events", []):
+        ident=event.get("item_id")
+        if isinstance(ident,str):
+            history.setdefault(ident,[]).append({
+                "action":event.get("action"),"actor":event.get("actor"),
+                "reason":event.get("reason"),"timestamp":event.get("timestamp",event.get("at")),
+                "before":event.get("before"),"after":event.get("after"),
+                "proposal_id":event.get("proposal_id"),
+            })
     for item in state["items"]:
-        add_node(_item_node(item))
+        node=_item_node(item)
+        node["metadata"]["decision_history"]=history.get(item["id"],[])[-25:]
+        add_node(node)
     for src in state["sources"]:
         add_node({
             "id": _key("sources", src["id"]), "entity_id": src["id"],
