@@ -16,6 +16,14 @@
 
 开发质量门槛：`python -m unittest discover -s evals -p 'test_*.py' -v`，GitHub Actions 在 Python 3.10/3.12 上运行相同套件。历史 v0.1 项目保留原始记录，不会静默迁移。
 
+## v0.2 本地提案写回（#6）
+
+新增可选的 **localhost-only proposal bridge**，只允许浏览器提交待确认的科研提案：`python scripts/local_editor.py serve PROJECT_ROOT`。它绑定 `127.0.0.1`，在终端打印一次性启动用的随机访问令牌 URL。浏览器仅能排队提案，不能直接批准或修改科研状态。
+
+在**另一交互终端**运行 `python scripts/local_editor.py inspect PROJECT_ROOT PROPOSAL_ID`，确认具体内容，再通过 `approve` 或 `reject` 子命令逐条处理。审批要求交互 TTY 和完整确认字符串；提案的 revision 不匹配会被拒绝。详见 [安全与操作说明](references/local-bridge-security.md)。这是本机工作流防护，不是身份认证或云端多人协作服务。
+
+现有 `research/dashboard/index.html` 依然完全离线、只读；正在规划的无限画布 #8/#10 尚未实现。
+
 ## 30 秒起步
 
 需要 Python 3.10+，不需要第三方包。以下命令从 Skill 目录执行：
