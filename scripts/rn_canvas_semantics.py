@@ -1,0 +1,315 @@
+"""Issue #10 — bounded, canonical-state simulation for canvas proposals.
+
+All changes are applied to an *in-memory copy* for previews. The same function
+is executed under the research workspace lock for terminal-approved commits.
+No changes to the scientific epistemic status are inferred or auto-approved.
+"""
+from __future__ import annotations
+
+import copy
+
+from rn_core import (ResearchError, RELATIONS, OUTCOME, WORKFLOW, item_by_id,
+                     new_item, now, propagate, require, validate_state)
+from rn_v02 import STANCES, EVIDENCE_QUALITIES
+
+SAFE_RELATIONS = ("depends-on", "member-of", "contributes-to", "tests", "implements")
+SAFE_STATUSES = ("to-be-determined", "ready-for-agent", "to-be-implemented", "in-progress")
+CANVAS_OPERATIONS = (
+    "add-item", "add-relation", "unlink-relation", "set-status",
+    "add-branch", "add-milestone", "revise-criterion", "attach-milestone-evidence",
+    "link-evidence",
+)
+
+
+def _text(value, key, limit=4000):
+    if not isinstance(value, str) or not value.strip() or len(value) > limit:
+        raise ResearchError(f"invalid or missing {key}")
+    return value.strip()
+
+
+def _strings(value, key, limit=10):
+    if not isinstance(value, list) or not 1 <= len(value) <= limit:
+        raise ResearchError(f"{key} must be a non-empty list")
+    return [_text(t, key, 500) for t in value]
+
+
+def validate_extra(operation, args):
+    """Reject unexpected or scientific-status override keys at the HTTP boundary."""
+    allowed = {
+        "add-branch": {"title", "goal", "stop_conditions", "module", "next_action"},
+        "add-milestone": {"title", "criteria", "module"},
+        "unlink-relation": {"source", "target", "relation"},
+        "revise-criterion": {"milestone_id", "criterion_id", "text"},
+        "attach-milestone-evidence": {"milestone_id", "criterion_id", "evidence_id"},
+        "link-evidence": {"claim_id", "evidence_id", "stance", "scope", "quality", "locator", "note"},
+    }
+    if operation not in allowed:
+        raise ResearchError("unsupported canvas semantic operation")
+    if set(args) - allowed[operation]:
+        raise ResearchError("unsupported semantic field")
+    if operation == "add-branch":
+        _text(args.get("title"), "branch title", 250)
+        _text(args.get("goal"), "branch goal")
+        _strings(args.get("stop_conditions"), "stop conditions")
+        _text(args.get("module", "topic"), "module", 40)
+        if args.get("next_action", ""):
+            _text(args["next_action"], "next action")
+    elif operation == "add-milestone":
+        _text(args.get("title"), "milestone title", 250)
+        _strings(args.get("criteria"), "milestone criteria")
+        _text(args.get("module", "experiment"), "module", 40)
+    elif operation == "unlink-relation":
+        if set(args) != {"source", "target", "relation"}:
+            raise ResearchError("unlink requires exact relation identity")
+        for key in args:
+            _text(args[key], key, 120)
+        if args["relation"] not in SAFE_RELATIONS:
+            raise ResearchError("cannot remove protected/archive provenance relations")
+    elif operation == "revise-criterion":
+        if set(args) != {"milestone_id", "criterion_id", "text"}:
+            raise ResearchError("criterion edit requires milestone, criterion and text")
+        _text(args["milestone_id"], "milestone", 120)
+        _text(args["criterion_id"], "criterion", 120)
+        _text(args["text"], "criterion text", 500)
+    elif operation == "attach-milestone-evidence":
+        if set(args) != {"milestone_id", "criterion_id", "evidence_id"}:
+            raise ResearchError("evidence attachment requires milestone, criterion and evidence")
+        for key in args:
+            _text(args[key], key, 120)
+    elif operation == "link-evidence":
+        for key in ("claim_id", "evidence_id", "stance", "scope"):
+            _text(args.get(key), key, 1000)
+        if args["stance"] not in STANCES:
+            raise ResearchError("invalid evidence stance")
+        if args.get("quality", "unverified") not in EVIDENCE_QUALITIES:
+            raise ResearchError("invalid evidence quality")
+        for key in ("quality", "locator", "note"):
+            if args.get(key) is not None and (not isinstance(args.get(key), str) or len(args[key]) > 1500):
+                raise ResearchError(f"invalid {key}")
+
+
+def _event(action, item_id, proposal_id, reason, after, before=None):
+    event = {"action": action, "item_id": item_id, "actor": "user",
+             "proposal_id": proposal_id, "reason": reason, "after": copy.deepcopy(after)}
+    if before is not None:
+        event["before"] = copy.deepcopy(before)
+    return event
+
+
+def _active(item):
+    if item["lifecycle_status"] != "active":
+        raise ResearchError("archived/revival-review entity needs formal lifecycle review")
+    return item
+
+
+def _touch(item):
+    item["revision"] += 1
+    item["updated_at"] = now()
+
+
+def _milestone(state, ident, *, editable=True):
+    item = item_by_id(state, ident)
+    if item["type"] != "Milestone":
+        raise ResearchError("target must be Milestone")
+    _active(item)
+    if editable and item["milestone"].get("accepted"):
+        raise ResearchError("accepted Milestone cannot be silently edited; use formal review")
+    return item
+
+
+def _criterion(mile, ident):
+    return next((c for c in mile["milestone"]["criteria"] if c["id"] == ident), None)
+
+
+def apply_to_state(state, clean, proposal_id="preview"):
+    """Mutate a private state copy; return (result, canonical audit events).
+
+    Caller decides whether to validate only or to commit via rn_core.write().
+    """
+    op, args, reason = clean["operation"], clean["params"], clean["reason"]
+    events = []
+    result = {}
+    if op == "add-item":
+        row = new_item(state, args["type"], args["title"], args["module"],
+                       description=args.get("description", ""),
+                       next_action=args.get("next_action", ""), actor="user")
+        result = {"id": row["id"], "type": row["type"]}
+        events.append(_event("item-created", row["id"], proposal_id, reason, row))
+    elif op in ("add-relation", "unlink-relation"):
+        a, b, t = args["source"], args["target"], args["relation"]
+        if t not in SAFE_RELATIONS:
+            raise ResearchError("relation must use the controlled lifecycle/evidence workflow")
+        first, second = _active(item_by_id(state, a)), _active(item_by_id(state, b))
+        row = {"from": a, "to": b, "type": t}
+        if op == "add-relation":
+            if a == b or row in state["relations"]:
+                raise ResearchError("self or duplicate relation")
+            if t == "member-of" and second["type"] != "ResearchBranch":
+                raise ResearchError("member-of must target ResearchBranch")
+            if t == "contributes-to" and second["type"] != "Milestone":
+                raise ResearchError("contributes-to must target Milestone")
+            state["relations"].append(row)
+            if t == "depends-on":
+                first["depends_on"].append(b)
+            action = "relation-added"
+        else:
+            if row not in state["relations"]:
+                raise ResearchError("relation not found")
+            state["relations"].remove(row)
+            if t == "depends-on":
+                first["depends_on"].remove(b)
+            action = "relation-unlinked"
+        result = row
+        events.append(_event(action, a, proposal_id, reason, row))
+    elif op == "set-status":
+        item = _active(item_by_id(state, args["item_id"]))
+        field, value = args["field"], args["value"]
+        if field == "workflow_status":
+            if value not in SAFE_STATUSES:
+                raise ResearchError("completion/retirement requires primary workflow")
+            require(value, WORKFLOW, field)
+        elif field == "outcome":
+            require(value, OUTCOME, field)
+            if item["type"] in ("Result", "Claim", "Milestone"):
+                raise ResearchError("scientific result/claim outcomes require evidence workflow")
+        else:
+            raise ResearchError("review, lifecycle and epistemic changes require main workflow")
+        before = item[field]
+        if before == value:
+            raise ResearchError("no-op status update is not recorded")
+        item[field] = value
+        _touch(item)
+        result = {"id": item["id"], "field": field, "value": value}
+        events.append(_event("status-changed", item["id"], proposal_id, reason,
+                             {field: value}, {field: before}))
+        if field == "outcome":
+            events += propagate(state, item["id"], "user", reason)
+    elif op == "add-branch":
+        row = new_item(state, "ResearchBranch", args["title"],
+                       args.get("module", "topic"), actor="user",
+                       next_action=args.get("next_action", ""))
+        row["branch"] = {"goal": args["goal"], "stop_conditions": args["stop_conditions"],
+                         "created_at": now()}
+        result = {"id": row["id"], "type": "ResearchBranch"}
+        events.append(_event("branch-created", row["id"], proposal_id, reason, row))
+    elif op == "add-milestone":
+        row = new_item(state, "Milestone", args["title"],
+                       args.get("module", "experiment"), actor="user")
+        row["milestone"] = {
+            "criteria": [{"id":f"C-{n+1:03d}","text":criterion,
+                          "evidence_refs":[],"reviewed":False}
+                         for n, criterion in enumerate(args["criteria"])],
+            "accepted":False, "approval_note":""}
+        result = {"id":row["id"], "type":"Milestone"}
+        events.append(_event("milestone-created", row["id"], proposal_id, reason, row))
+    elif op == "revise-criterion":
+        mile = _milestone(state, args["milestone_id"])
+        criterion = _criterion(mile, args["criterion_id"])
+        if criterion is None:
+            raise ResearchError("milestone criterion not found")
+        old = criterion["text"]
+        if old == args["text"]:
+            raise ResearchError("no-op criterion change")
+        criterion["text"] = args["text"]
+        criterion["reviewed"] = False
+        mile["review_status"] = "needs-user-confirmation"
+        mile["impact_status"] = "needs-review"
+        _touch(mile)
+        result = {"id":mile["id"], "criterion_id":criterion["id"], "text":criterion["text"]}
+        events.append(_event("milestone-criterion-revised", mile["id"], proposal_id, reason,
+                             result, {"criterion_id":criterion["id"], "text":old}))
+        events += propagate(state, mile["id"], "user", "criterion requires review")
+    elif op == "attach-milestone-evidence":
+        mile = _milestone(state, args["milestone_id"])
+        criterion = _criterion(mile, args["criterion_id"])
+        if criterion is None:
+            raise ResearchError("milestone criterion not found")
+        evidence_id = args["evidence_id"]
+        if evidence_id not in {e["id"] for e in state["sources"]}:
+            item_by_id(state, evidence_id)
+        if evidence_id in criterion["evidence_refs"]:
+            raise ResearchError("duplicate milestone evidence")
+        criterion["evidence_refs"].append(evidence_id)
+        criterion["reviewed"] = False
+        mile["impact_status"] = "needs-review"
+        _touch(mile)
+        result = {"id":mile["id"],"criterion_id":criterion["id"],"evidence_id":evidence_id}
+        events.append(_event("milestone-evidence-attached", mile["id"], proposal_id, reason, result))
+    elif op == "link-evidence":
+        claim = _active(item_by_id(state, args["claim_id"]))
+        if claim["type"] != "Claim":
+            raise ResearchError("evidence link requires Claim")
+        evidence_id = args["evidence_id"]
+        src = next((s for s in state["sources"] if s["id"] == evidence_id), None)
+        obj = src if src is not None else item_by_id(state, evidence_id)
+        quality = args.get("quality", "unverified")
+        if quality == "source-checked" and (src is None or
+                src["verification_status"] != "primary-inspected"):
+            raise ResearchError("source-checked requires inspected primary source")
+        if quality == "experiment-observed" and (obj.get("type") != "Result" or
+                not obj.get("observation") or not obj.get("artifact_path")):
+            raise ResearchError("experiment-observed requires documented Result artifact")
+        if any(x["claim_id"] == claim["id"] and x["evidence_id"] == evidence_id and
+               x["stance"] == args["stance"] and x["scope"] == args["scope"]
+               for x in state["evidence_links"]):
+            raise ResearchError("duplicate evidence link")
+        used = {x["id"] for x in state["evidence_links"]}
+        i = 1
+        while f"EVL-{i:04d}" in used:
+            i += 1
+        link = {
+            "id":f"EVL-{i:04d}","claim_id":claim["id"],"evidence_id":evidence_id,
+            "stance":args["stance"],"quality":quality,"scope":args["scope"],
+            "locator":args.get("locator",""),"note":args.get("note",""),
+            "created_at":now(),"recorded_by":"user"}
+        state["evidence_links"].append(link)
+        result = {"id":link["id"],"claim_id":claim["id"],"evidence_id":evidence_id}
+        events.append(_event("evidence-linked", link["id"], proposal_id, reason, link))
+        if args["stance"] == "contradicts":
+            before = claim["impact_status"]
+            claim["impact_status"] = "needs-review"
+            _touch(claim)
+            events.append(_event("impact-propagated",claim["id"],proposal_id,reason,
+                                 {"impact_status":"needs-review"},{"impact_status":before}))
+            events += propagate(state,claim["id"],"user","contradictory evidence")
+    else:
+        raise ResearchError("unknown semantic operation")
+    # Must use same canonical validator before previewing or committing.
+    validate_state(state, strict=True)
+    return result, events
+
+
+def preview_from_state(original, clean):
+    """Preview changes without touching state files or event log."""
+    revision=original["project"]["revision"]
+    if revision != clean["expected_revision"]:
+        raise ResearchError("stale proposal; refresh graph and retry")
+    before = copy.deepcopy(original)
+    after = copy.deepcopy(original)
+    result, events = apply_to_state(after, clean)
+    previous = {x["id"]:x for x in before["items"]}
+    changed = []
+    for item in after["items"]:
+        prior = previous.get(item["id"])
+        if prior != item:
+            changed.append({
+                "id": item["id"],
+                "before": ({"type":prior["type"],"lifecycle":prior["lifecycle_status"],
+                            "epistemic":prior["epistemic_status"],
+                            "impact":prior["impact_status"],"revision":prior["revision"]}
+                           if prior else None),
+                "after": {"type":item["type"],"lifecycle":item["lifecycle_status"],
+                          "epistemic":item["epistemic_status"],
+                          "impact":item["impact_status"],"revision":item["revision"]}})
+    return {
+        "project_revision":revision,
+        "operation":clean["operation"],
+        "result":result,
+        "impact":changed,
+        "changes": [{"action":e["action"],"item_id":e.get("item_id"),
+                     "before":e.get("before"),"after":e.get("after")} for e in events],
+        "accepted":False,
+        "scientifically_validated":False,
+        "requires_terminal_approval":True,
+        "message":"Preview only; no project files or research claims have been approved",
+    }
