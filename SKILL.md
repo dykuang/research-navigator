@@ -15,7 +15,14 @@ description: Use when a student or advisor wants to initiate, scope, investigate
 - `EvidenceLink`：细粒度支持/反驳/限定、适用范围、具体定位；不把摘要冒充全文，也不自动提升 epistemic status。
 - `SessionRef`：只保存 Codex/Agent 会话 ID 与研究节点的多对多关联，不读取聊天正文。无经验证的 provider 深链接时仅展示/复制会话 ID，不能声称自动跳转。
 - CLI 用法和安全边界见 `references/v02-operations.md`；新功能的源代码位于 `scripts/rn_domain.py` 和 `scripts/v02_project.py`，项目状态仍由 `rn_core.py` 校验并审计。
-- 原生 HTML 仍为离线只读快照。无限画布、浏览器受控写回不在 #2–#5 交付范围，属于后续 Issues。
+- 该段只描述 #2–#5 的基础范围；**#6–#12 已在 v0.2 分支实现本机受控提案、无限画布和 SessionRef UI**。独立生成的离线 HTML 仍为只读快照。
+
+## 完整 v0.2 归档回收和会话导航规则（#11–#12）
+
+- 如需归档 ResearchBranch/Idea，使用 `archive-route` 提案，说明失败/限制范围、诊断信心、回收条件，并经独立终端审阅批准；单个负结果不是全面失败证明。
+- 回收必须先用 `begin-revival-review` 获得第一独立批准，然后 `approve-revival-candidate` 第二次授权创建新的待验证候选；旧状态、负结果、历史事件、`derived-from` 与 `revives` 关系不得覆盖。仅参考已归档想法属于只读操作。
+- SessionRef 提案只处理 provider/workspace/session 元数据和多对多关联；Canvas 可复制 ID 与显示角色，不会自动抓取对话正文，也**不承诺尚未验证的 Codex 自动跳转**。详见 `references/canvas-guide.md`。
+- 完整 release/Windows/Codex 验收按 `docs/release-v0.2.md`、`references/windows-codex-qa.md`，不能把 CI 模拟人审视为真实身份认证或安装测试。
 
 ## 先做什么
 
