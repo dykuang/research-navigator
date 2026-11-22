@@ -15,6 +15,7 @@ from rn_core import (ResearchError, add_item, add_relation, change_status, load,
                      now, paths, read_json, workspace_lock)
 
 PROPOSAL_OPERATIONS = ("add-item", "add-relation", "set-status")
+SAFE_RELATIONS = ("depends-on", "member-of", "contributes-to", "tests", "implements")
 PUBLIC_ITEM_TYPES = ("Idea", "Hypothesis", "Task", "ResearchQuestion", "Claim", "Risk",
                      "Concept", "ExperimentPath", "Experiment", "Decision")
 MAX_FIELDS = 14
@@ -71,6 +72,8 @@ def validate_proposal(root, payload):
             raise ResearchError("relation requires source, target and relation type")
         for key in args:
             _validate_text(args, key, required=True, maxlen=120)
+        if args["relation"] not in SAFE_RELATIONS:
+            raise ResearchError("revival, supersession, support and blocking edges need the main Agent workflow")
     elif op == "set-status":
         if set(args) != {"item_id", "field", "value"}:
             raise ResearchError("status requires item_id, field and value")
@@ -199,6 +202,10 @@ def approve_proposal(root, proposal_id, *, confirmed=False):
             ident, field, value = args["item_id"], args["field"], args["value"]
             require(value,WORKFLOW if field=="workflow_status" else OUTCOME, field)
             row = item_by_id(state, ident)
+            if row["lifecycle_status"] != "active":
+                raise ResearchError("archived/revival-review items must use the primary lifecycle workflow")
+            if field == "outcome" and row["type"] in ("Result", "Claim", "Milestone"):
+                raise ResearchError("scientific result/claim outcomes require documented evidence workflow")
             prior = row[field]
             if prior == value:
                 raise ResearchError("no-op status update is not recorded")
