@@ -54,6 +54,12 @@ def main():
                 page.locator("#editMode").get_by_text("本机受控提案模式") if False else None
                 assert "本机受控提案模式" in page.locator("#editMode").inner_text()
                 assert page.locator(".node").count()==2
+                # Browser refresh keeps the same-tab capability without putting it
+                # back into the URL fragment. No secret stored in canonical state.
+                page.reload(wait_until="load")
+                page.locator('[data-node="item:'+idea["id"]+'"]').wait_for()
+                assert "本机受控提案模式" in page.locator("#editMode").inner_text()
+                assert "#token=" not in page.url
                 initial=load(root)
 
                 page.locator("#semanticOperation").select_option("add-branch")
