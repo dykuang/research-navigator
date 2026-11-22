@@ -225,6 +225,21 @@ class SchemaV02Tests(unittest.TestCase):
         self.assertEqual(load(self.root)["items"][0]["epistemic_status"],"hypothesis")
         self.assertEqual(load(self.root)["session_refs"][0]["entity_ids"],[])
 
+    def test_04_04_revising_result_invalidates_linked_claim_and_milestone(self):
+        result = add_item(self.root,kind="Result",title="SYNTHETIC result",
+                          module="experiment",observation="Toy metric",artifact_path="toy.log")
+        claim = add_item(self.root,kind="Claim",title="Effect claim",module="synthesis")
+        milestone = create_milestone(self.root,"Evidence review",["Claim checked"])
+        add_relation(self.root,claim["id"],milestone["id"],"contributes-to")
+        link_evidence(self.root,claim["id"],result["id"],"supports",
+                      "toy experimental protocol",quality="experiment-observed")
+        change_status(self.root,result["id"],"outcome","negative",
+                      "new synthetic result changed the interpretation")
+        by={x["id"]:x for x in load(self.root)["items"]}
+        self.assertEqual(by[claim["id"]]["impact_status"],"needs-review")
+        self.assertEqual(by[milestone["id"]]["impact_status"],"needs-review")
+        self.assertEqual(by[claim["id"]]["epistemic_status"],"uncertain")
+
 
 if __name__=="__main__":
     unittest.main()
