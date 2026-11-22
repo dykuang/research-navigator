@@ -75,7 +75,7 @@ def main():
             assert "布局已保存在此浏览器" in page.locator("#notice").inner_text()
             page.reload(wait_until="load")
             assert page.locator('[data-node="item:IDEA-0001"]').get_attribute("style")==after
-            page.locator("#view").select_option("routes")
+            page.locator("#view").select_option("evidence")
             assert page.locator(".node").count()<23
             page.locator("#view").select_option("all")
             page.locator("#search").fill("IDEA-0001")
