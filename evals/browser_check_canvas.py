@@ -98,6 +98,10 @@ def main():
             page.locator("#view").select_option("evidence")
             assert page.locator(".node").count()<23
             page.locator("#view").select_option("all")
+            # Real screenshot artifact is synthetic: no actual user research data.
+            capture=Path("artifacts")
+            capture.mkdir(parents=True,exist_ok=True)
+            page.screenshot(path=str(capture/"research-canvas-synthetic.png"),full_page=True)
             page.locator("#search").fill("IDEA-0001")
             assert page.locator(".node").count()==1
             page.locator("#search").fill("")
