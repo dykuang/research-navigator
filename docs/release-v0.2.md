@@ -77,7 +77,7 @@ A **GitHub native Milestone** groups repository issues. A scientific **Research 
 
 ### Automated evidence and screenshots
 
-See the latest successful [v0.2 CI runs](https://github.com/dykuang/research-navigator/actions/workflows/validate-v02.yml): Python 3.10/3.12 unit+integration, native Windows runner and Linux Chromium UI/security smokes. The browser job captures **an actual Chromium screenshot of a SYNTHETIC project** to the workflow artifact `research-canvas-synthetic-screenshot` (30-day retention), downloadable from the run's Artifacts section. This is **not a screenshot of a user's real research**. Screenshots are provided as reproducible CI artifacts rather than embedding a fictional image.
+See the [verified Chromium screenshot artifact run #45038688124](https://github.com/dykuang/research-navigator/actions/runs/45038688124) (Artifacts → `research-canvas-synthetic-screenshot`) and the latest [v0.2 CI runs](https://github.com/dykuang/research-navigator/actions/workflows/validate-v02.yml): Python 3.10/3.12 unit+integration, native Windows runner and Linux Chromium UI/security smokes. The browser job captures **an actual Chromium screenshot of a SYNTHETIC project** to the workflow artifact `research-canvas-synthetic-screenshot` (30-day retention), downloadable from the run's Artifacts section. This is **not a screenshot of a user's real research**. Screenshots are provided as reproducible CI artifacts rather than embedding a fictional image.
 
 ## Release checklist
 
