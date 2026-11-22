@@ -72,6 +72,12 @@ description: Use when a student or advisor wants to initiate, scope, investigate
 
 布局用独立 `research/canvas/views.json` 管理，保存/导入导出方式见 `references/canvas-guide.md` 和 `scripts/canvas_views.py`。文件只含坐标、缩放、折叠、视图名称/作者/修订，不允许存储审批或科学验证结果。用户要进行语义编辑时仍使用现有 CLI 或 #6 本机受控提案流程；未来浏览器的正式接入归 #10。
 
+## v0.2 画布语义编辑流程（#10）
+
+浏览器科研画布本身不得修改权威状态。若用户希望从画布**提出**科研新节点、路线、里程碑验收条件或证据关系，启动 `scripts/local_editor.py serve PROJECT_ROOT` 并在受保护的本机 Canvas 中按“模拟预览 → 提案入队 → 终端人工确认 → 刷新”操作。服务的 `/api/preview` 仅在内存中调用与正式审批相同的语义校验；`/api/proposals` 只写待审批草案；**不存在 HTTP 批准入口**。审批时终端再次展示影响并校验项目修订号，只有通过权威状态引擎才产生科研事件。
+
+归档和正式 revival、科学真实性确认、昂贵实验的执行依旧不能靠普通画布改标签绕过。脱机画布可导出草案，但**不得暗示写回成功**。操作和安全范围参见 `references/local-bridge-security.md`、`references/canvas-guide.md`。
+
 ## 常用命令与工具
 
 所有 CLI 都使用 Python 标准库，无网络要求。详细 CLI 例子见 `references/cli-recipes.md`。
