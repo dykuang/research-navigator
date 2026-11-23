@@ -1,0 +1,114 @@
+name: Publish v0.4.0 (one-time, verified PR merge)
+on:
+  workflow_run:
+    workflows:
+      - Validate Research Navigator v0.4
+    types:
+      - completed
+permissions:
+  contents: write
+  pull-requests: read
+  issues: write
+jobs:
+  publish:
+    name: Verify main CI, tag and publish v0.4.0
+    if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Publish stable release for exact validated merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          TEST_RUN_URL: ${{ github.event.workflow_run.html_url }}
+        shell: python
+        run: |
+          import json, os, urllib.request, urllib.error, sys
+
+          api_root="https://api.github.com/repos/"+os.environ["REPO"]
+          headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],
+                   "Accept":"application/vnd.github+json",
+                   "X-GitHub-Api-Version":"2022-11-28",
+                   "User-Agent":"research-navigator-v04-official-release"}
+          def api(method,path,body=None,missing_ok=False):
+              data=json.dumps(body).encode("utf-8") if body is not None else None
+              req=urllib.request.Request(api_root+path,data=data,headers=headers,method=method)
+              try:
+                  with urllib.request.urlopen(req,timeout=40) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as exc:
+                  if missing_ok and exc.code==404:return None
+                  raise
+          tag="v0.4.0"
+          main=api("GET","/git/ref/heads/main")["object"]["sha"]
+          tested=os.environ["TESTED_SHA"]
+          if main!=tested:
+              print("SKIP: a newer main commit exists; do not tag untested code.")
+              sys.exit(0)
+          existing_tag=api("GET","/git/ref/tags/"+tag,missing_ok=True)
+          if existing_tag and existing_tag["object"]["sha"]!=main:
+              print("SKIP: v0.4.0 already published for an earlier main commit; no retag.")
+              sys.exit(0)
+          pr=api("GET","/pulls/38")
+          if not pr.get("merged") or not pr.get("merged_at"):
+              raise SystemExit("Refusing release: PR #38 not merged")
+          expected=pr.get("merge_commit_sha")
+          if not expected:raise SystemExit("PR merge SHA missing")
+          ancestry=api("GET","/compare/"+expected+"..."+main)
+          if ancestry.get("status") not in ("identical","ahead"):
+              raise SystemExit("Refusing release: merged PR is not an ancestor of tested main")
+          for number in range(31,38):
+              issue=api("GET","/issues/"+str(number))
+              if issue.get("state")!="closed":
+                  raise SystemExit("Refusing release: issue #%d still open"%number)
+          release=api("GET","/releases/tags/"+tag,missing_ok=True)
+          if not existing_tag:
+              api("POST","/git/refs",{"ref":"refs/tags/"+tag,"sha":main})
+              print("Created tag:",tag,"at",main)
+          body="""Research Navigator v0.4.0 — Research Decision Intelligence
+
+          Extends the v0.3 reasoning graph with deterministic read-only
+          evidence-gap analysis, opportunity-to-learn check proposals
+          (without fabricated costs, probabilities or approval), archival
+          review watchlists, scientific Milestone readiness and mentor briefs.
+
+          The offline infinite Canvas now links to a self-contained research
+          decision page. Recorded negative, inconclusive and mixed runs prompt
+          scoped diagnosis, not automatic retirement of a method.
+
+          Validation: 139 Python regression tests on each of Linux Python
+          3.10, Linux Python 3.12 and native Windows Python 3.12; six additional
+          owner-like synthetic multi-round user journeys (24 turns), five v0.3
+          multi-round journeys, v0.4 synthetic research journey, Chromium
+          decision board / mobile and v0.3 Canvas regression. Temporary
+          test projects were automatically cleaned.
+
+          Safety: these tests do not prove real scientific results,
+          user authentication or physical owner Windows/Codex installation.
+          All suggestions are read-only and require real human decisions;
+          archived ideas stay isolated. Existing #15 is a separate manual
+          Windows/Codex integration gate.
+
+          See docs/uat-report-v0.4-2026-11-23.md and docs/roadmap/v0.4.md.
+
+          Post-merge verified CI: """+os.environ["TEST_RUN_URL"]
+          if not release:
+              api("POST","/releases",{"tag_name":tag,"target_commitish":main,
+                  "name":"Research Navigator v0.4.0",
+                  "body":body,"draft":False,"prerelease":False,
+                  "generate_release_notes":False})
+          elif release.get("draft") or release.get("prerelease"):
+              raise SystemExit("Existing release is not stable; investigate before proceeding")
+          verify=api("GET","/releases/tags/"+tag)
+          verify_tag=api("GET","/git/ref/tags/"+tag)["object"]["sha"]
+          if verify_tag!=main or verify["tag_name"]!=tag or verify["draft"] or verify["prerelease"]:
+              raise SystemExit("Release verification failed")
+          tracker=api("GET","/issues/30")
+          if tracker.get("state")!="closed":
+              api("PATCH","/issues/30",{"state":"closed","state_reason":"completed"})
+          milestone=api("GET","/milestones/2")
+          if milestone.get("state")!="closed":
+              api("PATCH","/milestones/2",{"state":"closed"})
+          print("OFFICIAL V0.4.0 RELEASE VERIFIED:",verify["html_url"])
+          print("VERIFIED SOURCE COMMIT:",main)
