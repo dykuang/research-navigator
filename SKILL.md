@@ -7,6 +7,23 @@ description: Use when a student or advisor wants to initiate, scope, investigate
 
 面向学生和导师的交互式科研工作流 Skill。**五个研究模块共享一个状态与证据系统**，可并行、回退、跨会话恢复；不要把它当作五次孤立问答。默认使用中文，保留学术术语的英文原文。
 
+## v0.2 开发分支新增能力（#2–#5）
+
+读现有项目时先检查 `research/state/project.json` 的 schema 版本。旧版 v0.1 项目可只读访问，任何修改之前须经用户同意运行 `python scripts/migrate_state.py preview PROJECT_ROOT` 然后 `apply`，生成备份；事务异常时停止操作并运行 `recover`。不能跳过校验手动写 JSON。
+
+- `ResearchBranch` 与科学 Milestone：多研究路线共享数据和 Baseline，里程碑验收需逐条附证据、人类确认，不等于实验科学结论成立。
+- `EvidenceLink`：细粒度支持/反驳/限定、适用范围、具体定位；不把摘要冒充全文，也不自动提升 epistemic status。
+- `SessionRef`：只保存 Codex/Agent 会话 ID 与研究节点的多对多关联，不读取聊天正文。无经验证的 provider 深链接时仅展示/复制会话 ID，不能声称自动跳转。
+- CLI 用法和安全边界见 `references/v02-operations.md`；新功能的源代码位于 `scripts/rn_domain.py` 和 `scripts/v02_project.py`，项目状态仍由 `rn_core.py` 校验并审计。
+- 该段只描述 #2–#5 的基础范围；**#6–#12 已在 v0.2 分支实现本机受控提案、无限画布和 SessionRef UI**。独立生成的离线 HTML 仍为只读快照。
+
+## 完整 v0.2 归档回收和会话导航规则（#11–#12）
+
+- 如需归档 ResearchBranch/Idea，使用 `archive-route` 提案，说明失败/限制范围、诊断信心、回收条件，并经独立终端审阅批准；单个负结果不是全面失败证明。
+- 回收必须先用 `begin-revival-review` 获得第一独立批准，然后 `approve-revival-candidate` 第二次授权创建新的待验证候选；旧状态、负结果、历史事件、`derived-from` 与 `revives` 关系不得覆盖。仅参考已归档想法属于只读操作。
+- SessionRef 提案只处理 provider/workspace/session 元数据和多对多关联；Canvas 可复制 ID 与显示角色，不会自动抓取对话正文，也**不承诺尚未验证的 Codex 自动跳转**。详见 `references/canvas-guide.md`。
+- 完整 release/Windows/Codex 验收按 `docs/release-v0.2.md`、`references/windows-codex-qa.md`，不能把 CI 模拟人审视为真实身份认证或安装测试。
+
 ## 先做什么
 
 1. 找到用户指定的**科研项目根目录**（不是本 Skill 安装目录）。检查 `RESEARCH.md`、`CONTEXT.md`、`research/state/`、现有研究记录、Git 状态；现有内容优先，不得无故覆盖。
@@ -51,6 +68,22 @@ description: Use when a student or advisor wants to initiate, scope, investigate
 | 组会、论文、交接、整合结果 | `references/modules/synthesis.md` | `research/05-synthesis/{claim-evidence-matrix,project-summary}.md` |
 
 成果总结不要求所有其他模块结束。**结构化状态文件是唯一权威源**；Markdown 文字材料和 HTML 是可复核的工作文档/派生视图，不应相互矛盾。
+
+## 可选本机提案接口（#6）
+
+`scripts/local_editor.py serve PROJECT_ROOT` 可在本机启动只接受 `127.0.0.1` 请求的受限提案服务；浏览器只允许**排队待审批提案**，不能直接写科研状态、确认/回收科研方向或假装完成科学验证。用户必须在**交互终端**执行 `inspect` 后逐条 `approve` 或 `reject`，服务端再次校验项目 revision 和全部状态约束，成功时写入事件记录。若服务未运行，原离线 HTML 仍为只读。安全边界和命令见 `references/local-bridge-security.md`。
+
+## v0.2 交互式无限画布与布局（#7–#9）
+
+`scripts/graph_projection.py` 从权威科研状态只读生成稳定节点/带来源关系。运行 `scripts/build_dashboard.py PROJECT_ROOT` 会生成两种离线只读工作台：原有 `research/dashboard/index.html`（经典 SVG 回退）和 `research/canvas/index.html`（无限可视画布）。画布可拖动节点、缩放、筛选、展开分支与检查详细证据，**所有交互均不自动更改任何研究真值或项目状态**。
+
+布局用独立 `research/canvas/views.json` 管理，保存/导入导出方式见 `references/canvas-guide.md` 和 `scripts/canvas_views.py`。文件只含坐标、缩放、折叠、视图名称/作者/修订，不允许存储审批或科学验证结果。用户要进行语义编辑时仍使用现有 CLI 或 #6 本机受控提案流程；未来浏览器的正式接入归 #10。
+
+## v0.2 画布语义编辑流程（#10）
+
+浏览器科研画布本身不得修改权威状态。若用户希望从画布**提出**科研新节点、路线、里程碑验收条件或证据关系，启动 `scripts/local_editor.py serve PROJECT_ROOT` 并在受保护的本机 Canvas 中按“模拟预览 → 提案入队 → 终端人工确认 → 刷新”操作。服务的 `/api/preview` 仅在内存中调用与正式审批相同的语义校验；`/api/proposals` 只写待审批草案；**不存在 HTTP 批准入口**。审批时终端再次展示影响并校验项目修订号，只有通过权威状态引擎才产生科研事件。
+
+归档和正式 revival、科学真实性确认、昂贵实验的执行依旧不能靠普通画布改标签绕过。脱机画布可导出草案，但**不得暗示写回成功**。操作和安全范围参见 `references/local-bridge-security.md`、`references/canvas-guide.md`。
 
 ## 常用命令与工具
 

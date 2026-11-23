@@ -11,24 +11,25 @@ import re
 import tempfile
 import uuid
 
-SCHEMA_VERSION = "0.1.0"
+SCHEMA_VERSION = "0.2.0"
+LEGACY_SCHEMA_VERSION = "0.1.0"
 MODULES = ("topic", "literature", "experiment", "pivot", "synthesis")
-TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "Concept", "Source", "PriorWork", "Baseline", "DatasetOrMaterial", "Experiment", "ExperimentPath", "Result", "Claim", "Decision", "Task", "Risk", "Artifact")
-PREFIXES = {"ResearchQuestion":"RQ", "Idea":"IDEA", "Method":"METH", "Hypothesis":"HYP", "Concept":"CON", "Source":"SRC", "PriorWork":"WORK", "Baseline":"BASE", "DatasetOrMaterial":"DATA", "Experiment":"EXP", "ExperimentPath":"PATH", "Result":"RES", "Claim":"CLAIM", "Decision":"DEC", "Task":"TASK", "Risk":"RISK", "Artifact":"ART"}
+TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "Concept", "Source", "PriorWork", "Baseline", "DatasetOrMaterial", "Experiment", "ExperimentPath", "Result", "Claim", "Decision", "Task", "Risk", "Artifact", "ResearchBranch", "Milestone")
+PREFIXES = {"ResearchQuestion":"RQ", "Idea":"IDEA", "Method":"METH", "Hypothesis":"HYP", "Concept":"CON", "Source":"SRC", "PriorWork":"WORK", "Baseline":"BASE", "DatasetOrMaterial":"DATA", "Experiment":"EXP", "ExperimentPath":"PATH", "Result":"RES", "Claim":"CLAIM", "Decision":"DEC", "Task":"TASK", "Risk":"RISK", "Artifact":"ART", "ResearchBranch":"BR", "Milestone":"MILE"}
 WORKFLOW = ("to-be-determined", "ready-for-agent", "to-be-implemented", "in-progress", "blocked", "done", "no-further-considered")
 EPISTEMIC = ("uncertain", "hypothesis", "source-backed", "experimentally-supported", "contradicted", "not-applicable")
 REVIEW = ("needs-user-confirmation", "user-confirmed", "not-required", "rejected")
 OUTCOME = ("unknown", "positive", "mixed", "negative", "inconclusive")
 LIFECYCLE = ("active", "parked", "quarantined", "retired", "under-revival-review")
 IMPACT = ("current", "needs-review", "stale", "blocked")
-RELATIONS = ("depends-on", "supports", "contradicts", "tests", "implements", "supersedes", "derived-from", "revives", "blocks")
+RELATIONS = ("depends-on", "supports", "contradicts", "tests", "implements", "supersedes", "derived-from", "revives", "blocks", "member-of", "contributes-to")
 ARCHIVED = ("parked", "quarantined", "retired")
 ACTORS = ("agent", "user", "mentor", "tool")
 ACCESS = ("full-text", "abstract", "secondary", "user-provided", "unavailable")
 VERIFICATIONS = ("unverified", "metadata-checked", "primary-inspected")
 FAILURE = ("theory", "method", "implementation", "data", "evaluation", "resources", "unknown")
-CRITICAL_TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "PriorWork", "Baseline", "Experiment", "Claim", "Result")
-CANDIDATE_TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "Baseline", "ExperimentPath", "Task")
+CRITICAL_TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "PriorWork", "Baseline", "Experiment", "Claim", "Result", "ResearchBranch", "Milestone")
+CANDIDATE_TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "Baseline", "ExperimentPath", "Task", "ResearchBranch")
 
 class ResearchError(ValueError):
     pass
@@ -39,7 +40,7 @@ def now():
 def paths(root):
     root = Path(root).expanduser().resolve()
     st = root / "research" / "state"
-    return {"root":root, "state":st, "project":st/"project.json", "items":st/"items.json", "relations":st/"relations.json", "sources":st/"sources.json", "events":st/"events.jsonl", "lock":st/".research-navigator.lock", "dash":root/"research"/"dashboard"/"index.html"}
+    return {"root":root, "state":st, "project":st/"project.json", "items":st/"items.json", "relations":st/"relations.json", "sources":st/"sources.json", "events":st/"events.jsonl", "session_refs":st/"session_refs.json", "evidence_links":st/"evidence_links.json", "journal":st/"pending-transaction.json", "lock":st/".research-navigator.lock", "dash":root/"research"/"dashboard"/"index.html"}
 
 def read_json(p):
     with Path(p).open(encoding="utf-8") as f:
@@ -85,7 +86,7 @@ def init_project(root, name, question=""):
     with workspace_lock(root):
         if p["project"].exists():
             raise ResearchError("项目已初始化；请直接 resume，不能重复初始化或覆盖")
-        if any(p[key].exists() for key in ("items", "relations", "sources", "events")):
+        if any(p[key].exists() for key in ("items", "relations", "sources", "session_refs", "evidence_links", "events", "journal")):
             raise ResearchError("检测到部分已有状态文件；为避免覆盖，停止初始化，请先检查/备份")
         stamp = now()
         project = {"schema_version":SCHEMA_VERSION, "project_id":str(uuid.uuid4()), "name":name, "research_question":question, "focus_module":"topic", "next_decision":"明确问题对象、研究目标与资源约束", "revision":0, "created_at":stamp, "updated_at":stamp}
@@ -93,6 +94,8 @@ def init_project(root, name, question=""):
         atomic_json(p["items"],{"items":[]})
         atomic_json(p["relations"],{"relations":[]})
         atomic_json(p["sources"],{"sources":[]})
+        atomic_json(p["session_refs"],{"session_refs":[]})
+        atomic_json(p["evidence_links"],{"evidence_links":[]})
         p["events"].touch(exist_ok=False)
         append_events(p, [{"action":"project-initialized", "actor":"user", "reason":"explicit initialization", "after":{"name":name, "research_question":question}}])
         intro = p["root"]/"RESEARCH.md"
@@ -102,9 +105,11 @@ def init_project(root, name, question=""):
 
 def load(root):
     p = paths(root)
+    if p["journal"].exists():
+        raise ResearchError("存在未完成的状态写入事务；先运行 migrate_state.py recover")
     if not p["project"].exists():
         raise ResearchError("未初始化项目；先执行 init")
-    return {"project":read_json(p["project"]), "items":read_json(p["items"])["items"], "relations":read_json(p["relations"])["relations"], "sources":read_json(p["sources"])["sources"], "events":read_events(p["events"])}
+    return {"project":read_json(p["project"]), "items":read_json(p["items"])["items"], "relations":read_json(p["relations"])["relations"], "sources":read_json(p["sources"])["sources"], "session_refs":read_json(p["session_refs"])["session_refs"] if p["session_refs"].exists() else [], "evidence_links":read_json(p["evidence_links"])["evidence_links"] if p["evidence_links"].exists() else [], "events":read_events(p["events"])}
 
 def read_events(path):
     if not path.exists(): return []
@@ -119,17 +124,71 @@ def append_events(p, events):
         f.flush()
         os.fsync(f.fileno())
 
-def write(root, state, events):
-    """Caller holds lock. Atomic per file; append-only event file. Validate before writing."""
+def write(root, state, events, expected_revision=None):
+    """Caller holds workspace lock. Crash-safe rollback journal, not a multi-file ACID database."""
     validate_state(state, strict=True)
     p=paths(root)
-    state["project"]["updated_at"]=now()
-    state["project"]["revision"]+=1
-    atomic_json(p["items"],{"items":state["items"]})
-    atomic_json(p["relations"],{"relations":state["relations"]})
-    atomic_json(p["sources"],{"sources":state["sources"]})
-    atomic_json(p["project"],state["project"])
-    append_events(p, events)
+    current=read_json(p["project"])
+    if current.get("schema_version") != SCHEMA_VERSION:
+        raise ResearchError("旧版项目只读；请先执行 migrate_state.py apply")
+    if expected_revision is not None and current["revision"] != expected_revision:
+        raise ResearchError(f"stale write: expected revision {expected_revision}, actual {current['revision']}")
+    if state["project"]["revision"] != current["revision"]:
+        raise ResearchError("loaded state revision is stale; reload before modifying")
+    if p["journal"].exists():
+        raise ResearchError("存在未恢复的事务；请运行 migrate_state.py recover")
+    saved={}
+    for key in ("project","items","relations","sources","session_refs","evidence_links"):
+        saved[key]=p[key].read_text(encoding="utf-8") if p[key].exists() else None
+    saved["events"]=p["events"].read_text(encoding="utf-8") if p["events"].exists() else None
+    # Record undo journal before changing state; explicit recovery is required after a crash.
+    atomic_json(p["journal"], {"project_id":current["project_id"],
+       "revision":current["revision"],"before":saved})
+    try:
+        state["project"]["updated_at"]=now()
+        state["project"]["revision"]+=1
+        atomic_json(p["items"],{"items":state["items"]})
+        atomic_json(p["relations"],{"relations":state["relations"]})
+        atomic_json(p["sources"],{"sources":state["sources"]})
+        atomic_json(p["session_refs"],{"session_refs":state.get("session_refs",[])})
+        atomic_json(p["evidence_links"],{"evidence_links":state.get("evidence_links",[])})
+        atomic_json(p["project"],state["project"])
+        append_events(p, events)
+        p["journal"].unlink()
+    except Exception:
+        rollback_transaction(root, expected_id=current["project_id"])
+        raise
+
+
+def rollback_transaction(root, expected_id=None):
+    """Only call while the workspace lock is held. Restores pre-write bytes exactly."""
+    p=paths(root)
+    if not p["journal"].exists():
+        return False
+    journal=read_json(p["journal"])
+    if expected_id and journal.get("project_id") != expected_id:
+        raise ResearchError("事务的项目 ID 与当前项目不匹配")
+    original=journal["before"]
+    for key in ("project","items","relations","sources","session_refs","evidence_links","events"):
+        dest=p[key]
+        content=original.get(key)
+        if content is None:
+            if dest.exists():dest.unlink()
+        else:
+            atomic_text(dest,content)
+    p["journal"].unlink()
+    return True
+
+
+def atomic_text(path, text):
+    path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
+    fd,tmp=tempfile.mkstemp(prefix=".rn-restore-",dir=path.parent,text=True)
+    try:
+        with os.fdopen(fd,"w",encoding="utf-8") as out:
+            out.write(text);out.flush();os.fsync(out.fileno())
+        os.replace(tmp,path)
+    finally:
+        if os.path.exists(tmp):os.unlink(tmp)
 
 def require(value, allowed, label):
     if value not in allowed: raise ResearchError(f"{label}={value!r} 无效，可选: {', '.join(allowed)}")
@@ -173,11 +232,11 @@ def validate_evidence_level(state, epistemic, refs, observation="", artifact="")
     if epistemic=="experimentally-supported" and not (observation.strip() and artifact.strip()):
         raise ResearchError("experimentally-supported 需要实际实验观察与工件路径；用户确认不能代替实验")
 
-def add_item(root, **kwargs):
+def add_item(root, *, expected_revision=None, proposal_id=None, **kwargs):
     with workspace_lock(root):
         state=load(root)
         item=new_item(state,**kwargs)
-        write(root,state,[{"action":"item-created","actor":kwargs.get("actor","agent"),"item_id":item["id"],"reason":"new research item","after":copy.deepcopy(item)}])
+        write(root,state,[{"action":"item-created","actor":kwargs.get("actor","agent"),"item_id":item["id"],"reason":"new research item","after":copy.deepcopy(item),"proposal_id":proposal_id}],expected_revision=expected_revision)
         return item
 
 def add_source(root, title, actor="agent", url="", doi="", authors="", year="", access_level="unavailable", verification_status="unverified", verification_note="", locator="", summary=""):
@@ -197,7 +256,7 @@ def add_source(root, title, actor="agent", url="", doi="", authors="", year="", 
         write(root,s,[{"action":"source-added","actor":actor,"item_id":row["id"],"reason":"source catalogued; bibliographic accuracy not independently guaranteed","after":row}])
         return row
 
-def add_relation(root, source, target, relation, actor="agent", reason=""):
+def add_relation(root, source, target, relation, actor="agent", reason="", *, expected_revision=None, proposal_id=None):
     require(relation,RELATIONS,"relation"); require(actor,ACTORS,"actor")
     with workspace_lock(root):
         s=load(root)
@@ -206,8 +265,12 @@ def add_relation(root, source, target, relation, actor="agent", reason=""):
         row={"from":source,"to":target,"type":relation}
         if row in s["relations"]: raise ResearchError("关系已存在")
         s["relations"].append(row)
+        if relation=="member-of" and item_by_id(s,target)["type"]!="ResearchBranch":
+            raise ResearchError("member-of must target ResearchBranch")
+        if relation=="contributes-to" and item_by_id(s,target)["type"]!="Milestone":
+            raise ResearchError("contributes-to must target Milestone")
         if relation=="depends-on": item_by_id(s,source)["depends_on"].append(target)
-        events=[{"action":"relation-added","actor":actor,"item_id":source,"reason":reason or "explicit relation","after":row}]
+        events=[{"action":"relation-added","actor":actor,"item_id":source,"reason":reason or "explicit relation","after":row,"proposal_id":proposal_id}]
         if relation in ("contradicts","blocks"):
             affected=item_by_id(s,target)
             before=affected["impact_status"]
@@ -215,7 +278,7 @@ def add_relation(root, source, target, relation, actor="agent", reason=""):
             affected["revision"]+=1;affected["updated_at"]=now()
             events.append({"action":"impact-propagated","actor":actor,"item_id":target,"reason":f"incoming {relation} relation from {source}","before":{"impact_status":before},"after":{"impact_status":affected["impact_status"]}})
             events+=propagate(s,target,actor,f"upstream {relation} {source}",block=(relation=="blocks"))
-        write(root,s,events)
+        write(root,s,events,expected_revision=expected_revision)
         return row
 
 def dependents(state, ident):
@@ -224,8 +287,11 @@ def dependents(state, ident):
     for r in state["relations"]:
         a,b,t=r["from"],r["to"],r["type"]
         if t=="depends-on" and b==ident:out.add(a)
-        elif t in ("supports","tests","implements") and a==ident:out.add(b)
+        elif t in ("supports","tests","implements","contributes-to","member-of") and a==ident:out.add(b)
         elif t=="supersedes" and b==ident:out.add(a)
+    for rel in state.get("evidence_links", []):
+        if rel.get("evidence_id") == ident:
+            out.add(rel["claim_id"])
     return out
 
 def propagate(state, ident, actor, reason, block=False):
@@ -243,7 +309,7 @@ def propagate(state, ident, actor, reason, block=False):
                 events.append({"action":"impact-propagated","actor":actor,"item_id":did,"reason":f"{reason}; upstream={ident}","before":{"impact_status":old},"after":{"impact_status":item["impact_status"]}})
     return events
 
-def change_status(root, ident, field, value, reason, actor="agent", evidence_refs=None, completion_note="", failure_category="unknown", failure_scope="", confidence="uncertain", revival_triggers="", lesson="", cost="", revival_question="", new_conditions=""):
+def change_status(root, ident, field, value, reason, actor="agent", evidence_refs=None, completion_note="", failure_category="unknown", failure_scope="", confidence="uncertain", revival_triggers="", lesson="", cost="", revival_question="", new_conditions="", *, expected_revision=None, proposal_id=None):
     fields={"workflow_status":WORKFLOW,"epistemic_status":EPISTEMIC,"review_status":REVIEW,"outcome":OUTCOME,"lifecycle_status":LIFECYCLE,"impact_status":IMPACT}
     if field not in fields: raise ResearchError("不可修改的字段")
     require(value,fields[field],field); require(actor,ACTORS,"actor")
@@ -264,7 +330,7 @@ def change_status(root, ident, field, value, reason, actor="agent", evidence_ref
             if not obj["acceptance_criteria"] or not completion_note:raise ResearchError("done 需要验收标准及完成情况/工件说明")
             obj["completion_note"]=completion_note
         if field=="lifecycle_status":
-            if obj["type"] not in ("ResearchQuestion","Idea","Method","Hypothesis","ExperimentPath","Baseline","Experiment"):
+            if obj["type"] not in ("ResearchQuestion","Idea","Method","Hypothesis","ExperimentPath","Baseline","Experiment","ResearchBranch"):
                 raise ResearchError("该实体类型不能按研究路线归档")
             if old=="active" and value=="under-revival-review": raise ResearchError("活跃想法无需回收审查")
             if old in ARCHIVED and value=="active":raise ResearchError("禁止从归档状态直接恢复 active；先复审并创建新版本")
@@ -286,13 +352,13 @@ def change_status(root, ident, field, value, reason, actor="agent", evidence_ref
             if old=="under-revival-review" and value in ARCHIVED:
                 obj["revival"] = None
         obj[field]=value; obj["revision"]+=1; obj["updated_at"]=now()
-        events.append({"action":"status-changed","actor":actor,"item_id":ident,"reason":reason,"evidence_refs":evidence_refs or [],"before":{field:old},"after":{field:value}})
+        events.append({"action":"status-changed","actor":actor,"item_id":ident,"reason":reason,"evidence_refs":evidence_refs or [],"before":{field:old},"after":{field:value},"proposal_id":proposal_id})
         if field in ("epistemic_status","lifecycle_status","outcome"):
             events+=propagate(s,ident,actor,reason,block=(field=="lifecycle_status" and value in ("quarantined","retired")))
-        write(root,s,events)
+        write(root,s,events,expected_revision=expected_revision)
         return obj,events
 
-def revive(root, ident, title, reason, approval_note, new_conditions, actor="user"):
+def revive(root, ident, title, reason, approval_note, new_conditions, actor="user", *, expected_revision=None, proposal_id=None):
     if actor not in ("user","mentor") or not approval_note.strip():raise ResearchError("新候选回收需要明确用户/导师批准说明")
     if not reason.strip() or not new_conditions.strip():raise ResearchError("回收需说明变化、风险和新的测试条件")
     with workspace_lock(root):
@@ -305,7 +371,7 @@ def revive(root, ident, title, reason, approval_note, new_conditions, actor="use
         old["lifecycle_status"]=previous
         old["revival"]=None
         old["updated_at"]=now();old["revision"]+=1
-        write(root,s,[{"action":"revival-candidate-created","actor":actor,"item_id":candidate["id"],"reason":reason,"approval":approval_note,"before":{"parent_id":ident,"parent_lifecycle":"under-revival-review"},"after":{"candidate_id":candidate["id"],"parent_lifecycle":previous,"new_conditions":new_conditions}}])
+        write(root,s,[{"action":"revival-candidate-created","actor":actor,"item_id":candidate["id"],"reason":reason,"approval":approval_note,"before":{"parent_id":ident,"parent_lifecycle":"under-revival-review"},"after":{"candidate_id":candidate["id"],"parent_lifecycle":previous,"new_conditions":new_conditions},"proposal_id":proposal_id}],expected_revision=expected_revision)
         return candidate
 
 def set_project(root, focus_module=None, research_question=None, next_decision=None, actor="user", reason=""):
@@ -347,7 +413,7 @@ def query(state, mode, user_authorized=False):
 def validate_state(s,strict=False):
     errors=[]
     p=s["project"]
-    if p.get("schema_version")!=SCHEMA_VERSION:errors.append("schema_version mismatch")
+    if p.get("schema_version") not in (SCHEMA_VERSION, LEGACY_SCHEMA_VERSION):errors.append("schema_version mismatch")
     ids=[i.get("id") for i in s["items"]]; source_ids=[x.get("id") for x in s["sources"]]
     if len(ids)!=len(set(ids)):errors.append("duplicate item IDs")
     if len(source_ids)!=len(set(source_ids)):errors.append("duplicate source IDs")
@@ -395,6 +461,9 @@ def validate_state(s,strict=False):
         if src.get("verification_status") not in VERIFICATIONS:errors.append(f"{src.get('id')}: invalid source verification")
         if src.get("access_level")=="abstract" and src.get("verification_status")=="primary-inspected":errors.append(f"{src.get('id')}: abstract masquerading as full text")
         if src.get("verification_status")!="unverified" and not src.get("verification_note"):errors.append(f"{src.get('id')}: verified without verification note")
+    # v0.2 domain validators inspect additive, optional sidecars.
+    from rn_v02 import validate_v02
+    errors.extend(validate_v02(s))
     if strict and errors:raise ResearchError("状态校验失败:\n- "+"\n- ".join(errors))
     return errors
 

@@ -1,10 +1,53 @@
-# Research Navigator v0.1
+# Research Navigator v0.2 development branch (v0.1 stable on main)
 
 科研项目的交互式规划 + 可追溯状态 + 原生离线 HTML 工作台。面向五个互相联动的模块：选题、文献与基线、实验、路线调整、总结。核心能力是 `active / parked / quarantined / retired / under-revival-review` 的受控研究记忆，以及明确定义的证据/人审/结果状态。
 
 ## 安装
 
 将整个 `research-navigator/` 文件夹解压到你的 Agent Skill 目录（例如 Codex 的 skills 目录）中，或在支持本地 Skill 的 Agent 中登记此目录。Skill 应读取根目录的 `SKILL.md`；不同 Agent 的安装路径和发现机制可能不同，本 ZIP 不会自动安装到你的账号/IDE。
+
+## v0.2 已实现的数据与命令能力（Issues #2–#5）
+
+当前开发分支在旧功能上新增了显式 schema 迁移/备份/恢复、版本冲突检查、ResearchBranch、科学验收型 Milestone、Claim–Evidence 关联，以及轻量 SessionRef（不读取聊天正文）。**#2–#5 的范围是数据层；后续 #6–#12 已在本开发分支实现受控提案 Bridge、交互画布、研究归档回收与 SessionRef UI。** 独立离线 HTML 仍为只读快照。
+
+- 升级已存在项目：先运行 `python scripts/migrate_state.py preview PROJECT_ROOT`，确认无误后运行 `python scripts/migrate_state.py apply PROJECT_ROOT`；出现事务残留时运行 `python scripts/migrate_state.py recover PROJECT_ROOT`。
+- 创建和管理分支/里程碑、证据链、Agent SessionRef：使用 `python scripts/v02_project.py --help`，参考 [v0.2 操作示例](references/v02-operations.md) 和 [schema 契约](references/state-schema.md)。
+- Agent/CLI 的人类授权要求未改变。 `--actor` 只记录声明，不是身份认证；URL 符合 HTTPS 不代表已验证 Codex 可跳转。
+
+开发质量门槛：`python -m unittest discover -s evals -p 'test_*.py' -v`，GitHub Actions 在 Python 3.10/3.12 上运行相同套件。历史 v0.1 项目保留原始记录，不会静默迁移。
+
+## v0.2 本地提案写回（#6）
+
+新增可选的 **localhost-only proposal bridge**，只允许浏览器提交待确认的科研提案：`python scripts/local_editor.py serve PROJECT_ROOT`。它绑定 `127.0.0.1`，在终端打印一次性启动用的随机访问令牌 URL。浏览器仅能排队提案，不能直接批准或修改科研状态。
+
+在**另一交互终端**运行 `python scripts/local_editor.py inspect PROJECT_ROOT PROPOSAL_ID`，确认具体内容，再通过 `approve` 或 `reject` 子命令逐条处理。审批要求交互 TTY 和完整确认字符串；提案的 revision 不匹配会被拒绝。详见 [安全与操作说明](references/local-bridge-security.md)。这是本机工作流防护，不是身份认证或云端多人协作服务。
+
+现有 `research/dashboard/index.html` 依然完全离线、只读；正在规划的无限画布 #8/#10 尚未实现。
+
+## v0.2 无限科研画布（#7–#9）
+
+已新增不依赖 CDN 或外部 JS 的**无限研究画布**。在项目根目录运行 `python scripts/build_dashboard.py PROJECT_ROOT` 后，会同时生成经典只读 SVG 工作台和 `research/canvas/index.html`。后者提供自由平移/缩放、拖动卡片、迷你地图、研究路线/证据/成果切换、过滤与详情检查，并能导出只读 SVG。
+
+节点位置、视口、折叠和固定模块组只属于**视图层**。浏览器“保存布局”存储在当前浏览器；可导出 JSON，再通过 `python scripts/canvas_views.py save PROJECT_ROOT LAYOUT_FILE --name default` 写入 `research/canvas/views.json`，重新生成画布即可跨设备或版本恢复布局。这**不会修改科学证据、研究状态或审批历史**。
+
+具体操作、离线兼容说明和限制见 [Canvas 使用指南](references/canvas-guide.md)。真正的画布语义编辑与 #6 提案接口整合仍计划在 #10，实现前不会出现虚假审批或“保存科研成果”按钮。
+
+## v0.2 画布语义提案与人工审批（#10）
+
+在 `python scripts/local_editor.py serve PROJECT_ROOT` 打印的私有本机地址打开服务首页，点击 **Open interactive Research Canvas**。这与之前独立的只读 HTML 画布不同：本机画布从受令牌保护的 `/api/graph` 读取**当前权威科研状态**，支持创建 Idea/Hypothesis/Task、ResearchBranch、科学 Milestone，安全建立/撤销关系，添加证据引用和修改待确认的验收条件。
+
+任何修改都须 **模拟预览（显示变更前后与影响）→ 提交待审批提案 → 本机交互终端逐条审阅并批准/拒绝 → 刷新科研图**。浏览器无直接批准或执行科研实验的能力。修改真实状态的审批命令为 `python scripts/local_editor.py approve PROJECT_ROOT PROPOSAL_ID`，必须在交互终端输入完整确认文本；旧修订版本、非法归档操作和无效证据会被拒绝。
+
+不启动服务时，`research/canvas/index.html` 仍是自包含、离线、只读 HTML，允许**导出提案草案 JSON**而不是虚假的“保存科研结果”。详见 [画布指南](references/canvas-guide.md) 与 [本机写回安全说明](references/local-bridge-security.md)。**终端确认不是身份认证，人工批准也不等于科学验证**。
+
+## v0.2 完整能力与发布边界（#11–#14）
+
+- **#11**：可从连接本机 Bridge 的画布提出 archive/park/quarantine/retire，正式双阶段回收复审，保留旧失败范围与 Result，产生新 `hypothesis` 派生候选（不是直接恢复旧研究路线）。
+- **#12**：SessionRef 多对多关联、Provider/Workspace 筛选、复制真实 Session ID；**真实 Codex 自动深链接尚未验证**，不会凭空构造 URL 或导入聊天正文。
+- **#13**：自动化合成数据回归与原生 Windows CI；真实用户电脑上的 Codex 安装与导航必须按 [Windows/Codex 验收清单](references/windows-codex-qa.md) 手动验证。
+- **#14**：完整发布检查见 [Release checklist](docs/release-v0.2.md) 和 [CHANGELOG](CHANGELOG.md)。GitHub 项目管理 Milestone 与科研实体 `Milestone` 是两回事。
+
+**安全原则**：画布里的科研修改只有经过 preview → pending proposal → 交互终端独立审批 → 刷新后才生效；`actor=user` / `confirmed=True` 不是身份认证；学术证据仍需独立核验。Windows PowerShell 运行含中文科研元数据的 CLI 时推荐先运行 `$env:PYTHONUTF8='1'`。
 
 ## 30 秒起步
 

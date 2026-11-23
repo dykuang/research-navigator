@@ -1,0 +1,113 @@
+# v0.2 Infinite Research Canvas — #7 / #8 / #9
+
+## What is actually shipped
+
+- `scripts/graph_projection.py`: read-only typed node/edge projection from canonical state, no parallel knowledge database; JSON export with stable namespaced IDs, provenance links, a full-graph export or deterministic pagination (max 1000 nodes/page), 4 research-oriented views plus archive/planning mode.
+- `scripts/build_canvas.py`: standalone offline `research/canvas/index.html` with embedded graph JSON. The existing `build_dashboard.py` also builds both the classic SVG dashboard **and** the new interactive canvas.
+- `templates/research_canvas.html`: dependency-free interactive infinite world-coordinates canvas, drag, zoom, keyboard arrow-key movement, minimap, search and filters, inspector, collapse-neighbors, route/evidence/outputs views and SVG export.
+- `scripts/canvas_views.py`: separately persisted canvas views at `research/canvas/views.json` with strict layout-only schema and project ID validation. No scientific status, evidence, review or audit event changes.
+
+## Quick start
+
+~~~bash
+python scripts/update_project.py init /PATH/PROJECT --name 'Example research'
+# populate the project with real research records through the Agent/CLI
+python scripts/build_dashboard.py /PATH/PROJECT
+# open /PATH/PROJECT/research/canvas/index.html in a browser
+# alternatively build only canvas:
+python scripts/build_canvas.py /PATH/PROJECT
+~~~
+
+The legacy dashboard `research/dashboard/index.html` contains a navigation link to the new canvas. Both outputs are offline, read-only **snapshots** of a specific research revision. Editing the real project requires the controlled CLI/Agent; drag/layout actions never create scientific results.
+
+## Canvas interaction
+
+- Pan: drag empty canvas; keyboard focus on workspace then arrow keys.
+- Zoom: wheel over canvas, toolbar +/- buttons or keyboard +/- on focused workspace.
+- Drag research cards: hold and move; keyboard focus on card and use arrows (Shift for larger increments). Enter/Space opens details.
+- Select a node to inspect status dimensions and explicit evidence, original source and relation provenance; no color means automatic scientific validation.
+- Filters: Explore, Evidence, Research Routes, Outputs, Planning and Archive; module, lifecycle, keyword and stable ID; minimap shows the current viewport.
+- Collapse/expand selected node's immediate neighbors; select and pin its module group to preserve its positions when resetting the rest.
+- Export current SVG directly from the visible graph, read-only and labeled with canonical revision.
+
+## Saved layouts and persistence — Issue #9
+
+Canvas **presentation** state stores only node x/y, world viewport (x/y/scale), collapsed node IDs, pinned module groups, author, saved view name, source graph revision and project ID. No evidence, epistemic status or approval fields are allowed.
+
+Click **保存布局** to save the named layout in the current browser's localStorage. This persists through a same-origin refresh but is browser/origin-specific and may be disabled on `file://` or privacy modes. **导出 JSON** always provides portable metadata independent of browser storage. Import accepts only a project-matching validated layout (2 MB limit).
+
+To persist exported layout under project files, use the CLI:
+
+~~~bash
+python scripts/canvas_views.py save /PATH/PROJECT ~/Downloads/research-layout-default.json --name default
+python scripts/canvas_views.py list /PATH/PROJECT
+python scripts/build_canvas.py /PATH/PROJECT
+~~~
+
+After rebuilding, the static canvas embeds `research/canvas/views.json`, and will restore its `default` layout unless this browser already has a local override. A saved non-default layout can be loaded by entering its name then clicking 恢复布局.
+
+To remove only a saved view:
+
+~~~bash
+python scripts/canvas_views.py delete /PATH/PROJECT 'Research Routes'
+~~~
+
+Missing/deleted node IDs in old layouts are retained as dormant coordinates in storage and ignored by the current canvas; new nodes get deterministic defaults. This preserves stable positions for unaffected records across graph revisions. If metadata is corrupt or from another project, the canvas fails safely to default positions; scientific records are unaffected.
+
+## Offline/online safety model
+
+- The HTML snapshots contain the project graph (including notes, linked references and metadata) **embedded**. Treat them as research files, not as public websites. Do not distribute sensitive local project snapshots without reviewing them.
+- The standalone canvas requires no CDN, external script, React build chain, or localhost server. Native SVG/HTML was chosen over React Flow for offline/stdlib-first deployment and backward compatibility; React Flow can be reconsidered if later collaborative editing demands it.
+- Both the old SVG view and new canvas remain read-only. They do **not** connect to `local_editor.py` yet: joining the future canvas to #6's controlled proposal queue is #10.
+- SessionRef cards represent only metadata and identifiers; no full chat texts or unverified deep-link navigation.
+- Layout persistence changes `research/canvas/views.json` or browser localStorage only; never `research/state/*.json` or audit events.
+
+## Verification
+
+~~~bash
+python -m unittest discover -s evals -p 'test_*.py' -v
+python evals/browser_check_canvas.py
+~~~
+
+Unit tests verify 100+ nodes, deterministic edge provenance, XSS-safe embedded JSON, portable layout import/schema validation, old dashboard availability and no canonical research mutation. The Playwright test uses a synthetic local HTTP-served project to exercise actual Chromium node drag, zoom, minimap, search, save/reload, JSON/SVG export and old dashboard fallback.
+
+## Scope limits
+
+No freehand drawing, real-time collaboration, automatic chat import, graph semantics editing, browser proposals or direct Codex session navigation are included in #7–#9. Those are later roadmap tasks. On projects with very large graphs, the CLI supports pagination and focus queries; the single-file canvas currently embeds the whole graph and is best for projects within normal browser memory.
+
+## #10 — Semantic proposals on a connected local Canvas
+
+To create or edit **research meaning**, do not open the static `research/canvas/index.html` snapshot as an editor. Instead start `python scripts/local_editor.py serve PROJECT_ROOT`, open the private printed capability URL and select **Open interactive Research Canvas**. The connected Canvas fetches live graph nodes via protected localhost `/api/graph`, never trusting a stale HTML snapshot as canonical state. The capability remains within the current browser tab's sessionStorage so a same-tab reload can reconnect; do not share or forward the link.
+
+In the right-side `科研语义提案` inspector, choose an operation, edit its JSON parameters, provide a meaningful reason and use **模拟影响（不写入）** to inspect the before/after diff and downstream impacts. You can fill IDs from the selected node. Operations include Idea/Hypothesis/Task, ResearchBranch creation, scientific Milestone creation, typed relation addition/removal, milestone criteria, evidence attachment and scoped Claim–Evidence links.
+
+After successful preview, **提交待审批** creates a proposal (not a canonical research write). In a separate interactive terminal run:
+
+~~~bash
+python scripts/local_editor.py inspect PROJECT_ROOT PROPOSAL_ID
+python scripts/local_editor.py approve PROJECT_ROOT PROPOSAL_ID
+# or reject:
+python scripts/local_editor.py reject PROJECT_ROOT PROPOSAL_ID
+~~~
+
+The terminal displays a fresh change preview and requires the exact `APPROVE PROPOSAL_ID` phrase. The project revision is rechecked under a lock; errors, conflicting edits or stale proposals fail without canonical writes. Click **刷新状态** to fetch committed nodes and the changed proposal status. A successful browser HTTP 202 is always **pending**, never approval. For an offline Canvas, use **导出草案 JSON** to preserve parameters only.
+
+Archived branches are not eligible for direct modification, revival links or positive planning. Accepted Milestone conditions require a new formal review; evidence metadata does not validate a scientific claim, and an Agent cannot authenticate a mentor by choosing an actor label. Browser proposals cannot launch experiments or create expensive tasks without a subsequent separate execution decision.
+
+See [local Bridge security](local-bridge-security.md) for the detailed permission and threat model.
+
+## #12 — SessionRef inspector and navigation support matrix
+
+From the connected or offline Research Canvas, select an Idea / Claim / ResearchBranch or a SessionRef card. The inspector displays matching external sessions, their provider, workspace ID, explicit role (`idea-origin`, `experiment-analysis`, `decision`, `park`, `revival`), recording actor/time, and a **copy Session ID** action. Use the Provider and Workspace filters; one session can link to several research entities and a single entity can have several sessions.
+
+From the **connected** localhost Canvas, use the semantic proposal panel to `register-session`, `link-session`, or `unlink-session`. The action is **not effective until separately approved in an interactive local terminal**. Without the Bridge, export the JSON draft instead. The graph contains only references, not full chat messages, transcripts, private conversation titles, credentials or automatic imports.
+
+| Provider / client | Store SessionRef IDs | Copy ID and workspace | Automatic verified session deeplink |
+|---|---|---|---|
+| Codex local / Windows | Yes, supplied real ID | Yes | **Not verified in v0.2**; manual navigation only |
+| ChatGPT | Yes, supplied real ID | Yes | **Not verified in v0.2**; manual navigation only |
+| Other Agent | Yes, supplied real ID | Yes | **Not verified in v0.2**; manual navigation only |
+
+A user-provided HTTPS URL is metadata; it is **not provider-verified**. No adapter currently sets `url_verified=true`. Therefore the inspector never invents URLs or renders an enabled Open button for unverified sessions. A missing/deleted/permission-denied external session remains a historical reference and degrades to manual ID copy. If a provider adapter is implemented in a future release, it must validate session authority before user-click navigation and warn about other projects. A workspace ID is a scope label, not proof of login or provider ownership.
+
+Check external sharing/privacy rules before publishing Canvas HTML snapshots, which contain research graph metadata. No SessionRef registration, unlinking, or navigation operation upgrades scientific truth.

@@ -1,0 +1,88 @@
+# #6 — Local proposal bridge and security model
+
+## Architecture
+The optional service uses Python standard library and binds only to `127.0.0.1` on an ephemeral port by default. The project root is fixed at launch. Browser HTTP requests cannot choose filesystem paths.
+
+| Endpoint | HTTP method | Operation |
+|---|---|---|
+| `/` | GET | Standalone local proposal form; no research mutations |
+| `/api/state` | GET | Token-protected and Host-checked minimal read-only projection |
+| `/api/proposals` | POST | Token, exact Host, Origin and Fetch-Site checks; simulate and enqueue validated draft only |
+| `/api/preview` | POST | Token-protected before/after/impact simulation, no writes |
+| `/api/graph` | GET | Token-protected canonical typed graph projection |
+| `/api/proposals/PROPOSAL_ID` | GET | Token-protected read-only pending/applied/rejected status |
+| `/canvas` | GET | Project-data-free canvas shell; graph fetched only after token authorization |
+| Any approval URL | Any | Not implemented (404/405) |
+
+The printed URL includes a random bearer capability in the URL fragment; the fragment is removed from the address bar by JavaScript and is never sent in the HTTP request URL. JS uses the X-RN-Token header. CSP nonces, X-Frame-Options, no-store caching, JSON-only POST, tight body size, strict origin/host checks, and no CORS guard against ordinary cross-site attacks. Capability exposure to another local process remains possible; this is NOT enterprise identity authentication.
+
+## How to use
+
+First check schema and migrate existing v0.1 projects explicitly:
+
+~~~bash
+python scripts/migrate_state.py preview /PATH/TO/PROJECT
+python scripts/migrate_state.py apply /PATH/TO/PROJECT
+~~~
+
+Launch the local proposal UI in terminal 1:
+
+~~~bash
+python scripts/local_editor.py serve /PATH/TO/PROJECT
+~~~
+
+Open the private printed URL in your browser. Use the form to submit add-item, add-relation or limited workflow/outcome status proposals. Each proposal has a reason, expected canonical revision and random ID. Proposals live in `research/canvas/proposals` rather than `research/state`. Queuing does not increment project revision or append canonical research events.
+
+Inspect and confirm a specific proposal in terminal 2:
+
+~~~bash
+python scripts/local_editor.py inspect /PATH/TO/PROJECT PROPOSAL_ID
+python scripts/local_editor.py approve /PATH/TO/PROJECT PROPOSAL_ID
+# or
+python scripts/local_editor.py reject /PATH/TO/PROJECT PROPOSAL_ID
+~~~
+
+The terminal CLI requires an interactive TTY and the exact string `APPROVE PROPOSAL_ID` or `REJECT PROPOSAL_ID`; piped responses are rejected. Every approval revalidates expected project revision, project ID, current schema, typed edges and cycles under the existing workspace lock. Successful application passes through the canonical write engine, recording proposal_id in its audit event and incrementing revision once. Repeated attempts fail. A stale proposal must be recreated from fresh state.
+
+### Deliberately excluded
+
+The browser cannot propose lifecycle transitions, review/epistemic promotions, resurrection from archive, completion or retirement, and cannot self-approve. Browser relations are limited to depends-on, member-of, contributes-to, tests and implements; revives, derived-from, supports, contradicts, blocks and supersedes must use their controlled research workflows. Archived records cannot be modified through proposal status updates. Scientific Result/Claim/Milestone outcomes require dedicated evidence workflows. These require the primary Agent/CLI workflow and genuine human authorization. The `--actor`/`confirmed=True` fields alone are not authentication; a malicious local filesystem writer remains outside this safeguard's threat model.
+
+### Threat model and operational limitations
+
+- Loopback-only IPv4 interface, no remote/0.0.0.0 binding, no TLS or multi-user service.
+- Exact Host + Origin + Fetch-Site checks and bearer capability reduce DNS rebinding / CSRF / cross-site requests.
+- The HTTP API does not expose any raw-filesystem or approval endpoint; proposal filenames are server-generated, and project path never comes from requests.
+- Current undo journal can recover an interrupted canonical write via `python scripts/migrate_state.py recover PROJECT_ROOT`. An applied-but-unacknowledged proposal is rejected as stale, never blindly reapplied.
+- The read-only state API returns scoped ID/type/title/status/relations, not session contents, events or source full text.
+- No cryptographic human identity, no multi-machine transaction guarantees, no protection against hostile local processes with project filesystem write permission.
+
+### Offline fallback
+
+The existing generated `research/dashboard/index.html` remains standalone and readonly, even if the service is absent. There are no inactive or misleading approval buttons in the offline dashboard. The future #8/#10 canvas must treat a 202 proposal response as pending, never a committed research change.
+
+### Test
+
+~~~bash
+python -m unittest discover -s evals -p 'test_*.py' -v
+~~~
+
+Security regression covers Host/Origin/token rejection, absence of HTTP approval, stale revisions, invalid typed relations, proposal-only operation, CLI TTY enforcement and audit event exactly-once behavior.
+
+## #10: Live Canvas semantic proposals
+
+When the localhost bridge is running, open the printed capability URL and click **Open interactive Research Canvas**. You can also open the same origin's `/canvas#token=...` URL using the private launch token. The canvas shell contains no project details for unauthenticated requests. Only `/api/graph` with a valid `X-RN-Token` returns research node/edge data. Do not expose a bridge session over a public proxy or share its token.
+
+The right-hand **科研语义提案** panel offers typed operations and editable JSON parameters: new Idea/Hypothesis/Task, ResearchBranch with goal and stop conditions, scientific Milestone with acceptance criteria, typed relation add/unlink, criterion revision, milestone evidence attachment, and Claim–Evidence provenance. Choose a node and click **使用选中节点** to populate IDs. For expensive experiments, the created Task is only a candidate; the bridge does not execute experiments.
+
+1. Click **模拟影响（不写入）**. The bridge validates the exact current project revision and runs the same canonical rules on a private in-memory copy; returns proposed before/after changes and affected nodes.
+2. Click **提交待审批**. The proposal goes to a separate queue only after passing simulation. A successful HTTP 202 means *pending*, not applied.
+3. Inspect the ID and verify the full parameters and rationale in an interactive local terminal: `python scripts/local_editor.py inspect PROJECT_ROOT PROPOSAL_ID`.
+4. Approve by `python scripts/local_editor.py approve PROJECT_ROOT PROPOSAL_ID`, typing the full confirmation phrase; or reject instead.
+5. Back in the canvas, click **刷新状态**. A successfully approved edit appears in the live canonical graph at its new project revision; stale, rejected and pending proposals are distinct states.
+
+No HTTP endpoint can approve a proposal. The terminal is the explicit human approval gate; `confirmed=True` and `actor=user` are internal assertions and are **not** real person authentication. Browser JSON parameter editing is an intentionally transparent advanced interface; future UX improvements can replace it with dedicated forms without modifying the safety contract.
+
+**Preserved restrictions:** archived entities cannot be linked into active planning, moved to `active`, or edited through this bridge; `revives`, `derived-from`, `supersedes`, `supports`, `blocks` and `contradicts` relations are not general canvas-edit operations. Evidence links are separately typed and scoped; attaching evidence never validates a claim automatically. Accepted Milestones cannot have criteria silently changed. Any invalid semantic proposal is rejected before entering the queue; stale approvals are rejected with no canonical writes. The normal offline `research/canvas/index.html` remains view-only and offers JSON draft export, not fake approval buttons.
+
+**Testing:** `evals/test_canvas_semantics.py` exercises shared Baseline, Milestone, criterion, evidence provenance, unlinking and stale proposals. `evals/browser_check_canvas_semantic.py` exercises actual protected localhost Chromium preview → queue → terminal-mediated simulated approval → refresh and blocked archive changes; its programmatic `confirmed=True` emulates the terminal approval **only within an isolated test fixture**, not human verification in production.
