@@ -1,0 +1,73 @@
+name: Validate Research Navigator v0.3
+on:
+  push:
+    branches:
+      - feat/v0.3-scientific-reasoning-graph
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reasoning-tests:
+    name: Research reasoning / ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.10"
+          - os: ubuntu-latest
+            python: "3.12"
+          - os: windows-latest
+            python: "3.12"
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Compile scripts
+        run: python -m compileall -q scripts
+      - name: Full v0.1/v0.2/v0.3 unittest regression
+        run: python -m unittest discover -s evals -p 'test_*.py' -v
+      - name: Multi-round student/supervisor synthetic journeys with automatic cleanup
+        run: python evals/uat_v03_multiround.py
+      - name: Synthetic v0.3 CLI and canonical state smoke
+        shell: bash
+        run: |
+          python scripts/update_project.py init smoke --name "SYNTHETIC FIXTURE - no real experiments"
+          python scripts/update_project.py add-item smoke --type Experiment --title "Synthetic fixture protocol" --module experiment
+          python scripts/v03_project.py run-plan smoke --experiment EXP-0001 --title "Synthetic attempt" --attempt 1
+          python -c "from pathlib import Path; p=Path('smoke/toy.log'); p.write_text('SYNTHETIC FIXTURE: not a real experiment',encoding='utf-8')"
+          python scripts/v03_project.py run-record smoke --run RUN-0001 --dataset toy-v1 --protocol toy-v1 --code-revision synthetic --seed 42 --artifact toy.log --observation "Toy mock measurement" --outcome inconclusive --metric 'F1=0.62:ratio:higher' --started-at 2026-11-23T01:00:00+00:00 --ended-at 2026-11-23T01:01:00+00:00 --synthetic
+          python scripts/v03_project.py run-list smoke --experiment EXP-0001
+          python scripts/validate_state.py smoke
+          python scripts/build_dashboard.py smoke
+          python scripts/graph_projection.py smoke --view reasoning
+
+  reasoning-browser:
+    name: Chromium / v0.3 reasoning inspector
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright and Chromium
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Real browser reasoning nodes and inspector
+        run: python evals/browser_check_v03_reasoning.py

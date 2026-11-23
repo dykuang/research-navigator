@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — v0.3 Scientific Reasoning Graph
+
+- Added canonical `ExperimentRun` and `DecisionTrace` entities without replacing the v0.2 storage schema.
+- Added project-local artifact verification + SHA-256, explicit run attempts and Result lineage; invalidation propagates evidence-review impact without deleting negative history.
+- Added scoped Claim–Evidence advisory conflict reports and event/SessionRef-based decision provenance replay. No inferred transcript or automatic scientific validation.
+- Added `reasoning` graph projection view, typed links and read-only Canvas node inspector; existing protected proposal bridge remains unchanged.
+- Added v0.3 CLI, synthetic regression tests, and cross-platform CI release gate.
+- Milestone: [v0.3 Scientific Reasoning Graph](https://github.com/dykuang/research-navigator/milestone/1); target draft PR remains unmerged until review.
+
+
 All notable Research Navigator changes are recorded here. Development changes live on `v0.2`; the default `main` branch remains the v0.1 line unless reviewed and merged separately.
 
 ## [0.2.0-rc] — 2026-11-22 (release candidate, **not tagged or merged**)

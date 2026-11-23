@@ -1,0 +1,95 @@
+name: Publish v0.3.0 (one-time, after verified PR merge)
+on:
+  workflow_run:
+    workflows:
+      - Validate Research Navigator v0.3
+    types:
+      - completed
+permissions:
+  contents: write
+jobs:
+  publish:
+    name: Verify merge SHA, tag and publish official v0.3.0
+    if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Release exactly the validated PR 28 merge commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          TEST_RUN_URL: ${{ github.event.workflow_run.html_url }}
+        shell: python
+        run: |
+          import json, os, urllib.request, urllib.error
+          api_root = "https://api.github.com/repos/" + os.environ["REPO"]
+          headers = {"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                     "Accept": "application/vnd.github+json",
+                     "X-GitHub-Api-Version": "2022-11-28",
+                     "User-Agent": "research-navigator-v03-official-release"}
+          def api(method, path, body=None, missing_ok=False):
+              data = json.dumps(body).encode("utf-8") if body is not None else None
+              req = urllib.request.Request(api_root+path, data=data, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=40) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as e:
+                  if missing_ok and e.code == 404:
+                      return None
+                  raise
+          pr = api("GET", "/pulls/28")
+          if not pr.get("merged") or not pr.get("merged_at"):
+              raise SystemExit("Refusing release: PR #28 not merged")
+          expected = pr["merge_commit_sha"]
+          tested = os.environ["TESTED_SHA"]
+          main = api("GET", "/git/ref/heads/main")["object"]["sha"]
+          if tested != main or expected != main:
+              raise SystemExit("Refusing release: tested SHA / main / PR merge SHA differ")
+          release_tag = "v0.3.0"
+          tagged = api("GET", "/git/ref/tags/"+release_tag, missing_ok=True)
+          if tagged and tagged["object"]["sha"] != main:
+              raise SystemExit("Refusing release: existing v0.3.0 tag points elsewhere")
+          if not tagged:
+              tagged = api("POST", "/git/refs", {"ref":"refs/tags/"+release_tag,"sha":main})
+              print("Created official lightweight tag", release_tag, "at", main)
+          existing = api("GET", "/releases/tags/"+release_tag, missing_ok=True)
+          notes = """Research Navigator v0.3.0 — Scientific Reasoning Graph & Decision Provenance
+
+          This release extends the v0.2 Research Canvas with typed ExperimentRun
+          records, checked project-local artifact hashes, scoped Claim–Evidence
+          conflict inspection, DecisionTrace event/SessionRef provenance replay,
+          and a read-only Scientific Reasoning Canvas view.
+
+          Validation: 126 Python tests/platform on Linux 3.10, Linux 3.12,
+          and native Windows 3.12; 5/5 synthetic multi-round researcher journeys,
+          v0.3 Chromium inspector and v0.2 full browser regressions.
+          An actual simulated archive isolation bug (#29) was found and fixed.
+
+          Synthetic tests do NOT prove scientific truth, real on-device Codex
+          discovery or session deep linking. Recorded approvals are not identity
+          authentication. No test fixture projects are shipped.
+
+          See docs/uat-report-v0.3-2026-11-23.md and docs/roadmap/v0.3.md
+          for details and known boundaries.
+
+          Verified post-merge CI: """+os.environ["TEST_RUN_URL"]
+          if existing:
+              if existing.get("target_commitish") not in (main, "main"):
+                  raise SystemExit("Refusing release: existing release target differs")
+              if existing.get("draft") or existing.get("prerelease"):
+                  raise SystemExit("Existing release is not stable; review required")
+              release = existing
+              print("Release already present; no duplicate created")
+          else:
+              release = api("POST", "/releases", {"tag_name":release_tag,
+                  "target_commitish":main, "name":"Research Navigator v0.3.0",
+                  "body":notes, "draft":False, "prerelease":False,
+                  "generate_release_notes":False})
+          verify_tag = api("GET", "/git/ref/tags/"+release_tag)["object"]["sha"]
+          verify_release = api("GET", "/releases/tags/"+release_tag)
+          assert verify_tag == main
+          assert verify_release["tag_name"] == release_tag
+          assert not verify_release["draft"] and not verify_release["prerelease"]
+          print("OFFICIAL V0.3.0 PUBLISHED:", verify_release["html_url"])
+          print("IMMUTABLE TARGET COMMIT:", main)

@@ -1,4 +1,6 @@
-# Research Navigator v0.2 development branch (v0.1 stable on main)
+# Research Navigator · v0.3 Scientific Reasoning Graph (development branch)
+
+> v0.2 Research Canvas has merged to `main`; v0.3 is currently under development on `feat/v0.3-scientific-reasoning-graph`. Stable release is **not** claimed.
 
 科研项目的交互式规划 + 可追溯状态 + 原生离线 HTML 工作台。面向五个互相联动的模块：选题、文献与基线、实验、路线调整、总结。核心能力是 `active / parked / quarantined / retired / under-revival-review` 的受控研究记忆，以及明确定义的证据/人审/结果状态。
 

@@ -24,6 +24,12 @@ description: Use when a student or advisor wants to initiate, scope, investigate
 - SessionRef 提案只处理 provider/workspace/session 元数据和多对多关联；Canvas 可复制 ID 与显示角色，不会自动抓取对话正文，也**不承诺尚未验证的 Codex 自动跳转**。详见 `references/canvas-guide.md`。
 - 完整 release/Windows/Codex 验收按 `docs/release-v0.2.md`、`references/windows-codex-qa.md`，不能把 CI 模拟人审视为真实身份认证或安装测试。
 
+## v0.3 科研推理图扩展（当前开发分支）
+
+如用户要求追踪真实实验尝试、检查同一 Claim 的冲突证据、或根据明确记录的历史事件回放研究决策，按需读取 `references/reasoning-v03.md`，使用 `scripts/v03_project.py`。该扩展在 v0.2 规范状态库中增加 `ExperimentRun` 与 `DecisionTrace`，**不自动修改已有记录或提升科学证据等级**。真实实验工件必须存在于项目目录且经过 SHA-256 检查，合成示例必须显式标记；决策回放只显示已有事件与 SessionRef，不推测缺失聊天正文。
+
+科研推理画布的 `reasoning` 视图与节点详情为只读；v0.2 受保护的本机提案桥仍负责既有语义写入。不得把 CLI 中的 `--actor` 当作真实身份认证，也不得声称 v0.3 已发布稳定版。
+
 ## 先做什么
 
 1. 找到用户指定的**科研项目根目录**（不是本 Skill 安装目录）。检查 `RESEARCH.md`、`CONTEXT.md`、`research/state/`、现有研究记录、Git 状态；现有内容优先，不得无故覆盖。
