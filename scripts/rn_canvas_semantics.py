@@ -50,7 +50,7 @@ def validate_extra(operation, args):
                           "revival_triggers", "confidence", "lesson", "cost", "evidence_refs"},
         "begin-revival-review": {"item_id", "question", "new_conditions"},
         "approve-revival-candidate": {"item_id", "title", "new_conditions",
-                                     "approval_note"},
+                                     "approval_note", "goal", "stop_conditions"},
         "reject-revival-review": {"item_id", "decision_note"},
         "register-session": {"provider", "workspace_id", "session_id", "url"},
         "link-session": {"session_ref_id", "entity_id", "role"},
@@ -112,6 +112,12 @@ def validate_extra(operation, args):
         _text(args.get("title"), "candidate title", 250)
         _text(args.get("new_conditions"), "new conditions")
         _text(args.get("approval_note"), "second explicit human authorization")
+        # Branch-specific fields are mandatory for a Branch, verified again
+        # against the actual archived item in apply_to_state().
+        if "goal" in args:
+            _text(args["goal"], "new branch goal")
+        if "stop_conditions" in args:
+            _strings(args["stop_conditions"], "new branch stop conditions")
     elif operation == "reject-revival-review":
         _text(args.get("item_id"), "reviewed item", 120)
         _text(args.get("decision_note"), "review rejection rationale")
@@ -384,12 +390,24 @@ def apply_to_state(state, clean, proposal_id="preview"):
             raise ResearchError("first formal revival review approval is required")
         if args["new_conditions"].strip()==old["archive"].get("failure_scope","").strip():
             raise ResearchError("candidate must describe changed conditions, not repeat known failure")
+        if old["type"] == "ResearchBranch":
+            # Never silently copy old failed research gates into a new route.
+            _text(args.get("goal"), "new branch goal")
+            _strings(args.get("stop_conditions"), "new branch stop conditions")
+        elif "goal" in args or "stop_conditions" in args:
+            raise ResearchError("branch goal/stop conditions only apply to ResearchBranch")
         previous=old["revival"]["original_lifecycle"]
         candidate=new_item(state,old["type"],args["title"],old["module"],
             description=f"由 {old['id']} 派生；变化：{args['new_conditions']}；待验证：{reason}",
             actor="user",workflow="to-be-determined",epistemic="hypothesis",
             review="needs-user-confirmation",next_action="设计最低成本证伪/复现实验",
             derived_from=old["id"])
+        if old["type"] == "ResearchBranch":
+            candidate["branch"] = {
+                "goal": args["goal"].strip(),
+                "stop_conditions": [c.strip() for c in args["stop_conditions"]],
+                "created_at": now(),
+            }
         for kind in ("derived-from","revives"):
             state["relations"].append({"from":candidate["id"],"to":old["id"],"type":kind})
         old["lifecycle_status"]=previous
@@ -397,6 +415,8 @@ def apply_to_state(state, clean, proposal_id="preview"):
         _touch(old)
         result={"id":candidate["id"],"type":candidate["type"],
                 "derived_from":old["id"],"original_lifecycle":previous}
+        if old["type"] == "ResearchBranch":
+            result["branch"] = copy.deepcopy(candidate["branch"])
         events.append(_event("revival-candidate-created",candidate["id"],proposal_id,reason,
             {**result,"new_conditions":args["new_conditions"],
              "approval_note":args["approval_note"]},
