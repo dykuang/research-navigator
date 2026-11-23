@@ -4,7 +4,9 @@ Scientific proof is NOT inferred from records or synthetic logs.
 """
 from __future__ import annotations
 from datetime import datetime
+import math
 
+VERSION = "0.3.0"  # additive feature contract; canonical project format remains 0.2.0
 RUN_STATES = ("planned", "running", "recorded", "invalidated")
 TRACE_STATES = ("documented", "incomplete", "disputed")
 METRIC_DIRECTIONS = ("higher", "lower", "target", "descriptive")
@@ -30,6 +32,11 @@ def validate_v03(state):
                 errors.append(f"{ident}: invalid run status")
             if not isinstance(run.get("attempt"), int) or isinstance(run.get("attempt"), bool) or run["attempt"] < 1:
                 errors.append(f"{ident}: attempt must be a positive integer")
+            if isinstance(run.get("attempt"), int) and not isinstance(run["attempt"], bool) and run["attempt"] > 0:
+                key = (run.get("experiment_id"), run["attempt"])
+                if key in run_artifacts:
+                    errors.append(f"{ident}: duplicate experiment attempt {key}")
+                run_artifacts.add(key)
             if run.get("status") in ("recorded", "invalidated"):
                 for key in ("dataset", "protocol", "code_revision", "artifact_path", "artifact_sha256", "started_at", "ended_at"):
                     if not isinstance(run.get(key), str) or not run[key].strip():
@@ -43,6 +50,22 @@ def validate_v03(state):
                 result = items.get(run.get("result_id"))
                 if not result or result.get("type") != "Result" or not result.get("observation") or not result.get("artifact_path"):
                     errors.append(f"{ident}: recorded run must link to an observed Result")
+                for date_key in ("started_at", "ended_at"):
+                    text = run.get(date_key)
+                    if isinstance(text, str) and text.strip():
+                        try:
+                            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+                            if parsed.tzinfo is None:
+                                raise ValueError("timezone missing")
+                        except ValueError:
+                            errors.append(f"{ident}: {date_key} must be timezone-aware ISO 8601")
+                result = items.get(run.get("result_id"))
+                if result and result.get("type") == "Result":
+                    if result.get("artifact_path") != run.get("artifact_path"):
+                        errors.append(f"{ident}: Result artifact must match verified Run artifact")
+                    if not any(r.get("from") == result["id"] and r.get("to") == ident and
+                               r.get("type") == "depends-on" for r in state.get("relations", [])):
+                        errors.append(f"{ident}: missing Result-to-Run provenance relation")
                 metrics = run.get("metrics")
                 if not isinstance(metrics, list):
                     errors.append(f"{ident}: metrics must be an explicit list")
@@ -56,13 +79,9 @@ def validate_v03(state):
                         if metric.get("direction") not in METRIC_DIRECTIONS or not isinstance(metric.get("unit"), str):
                             errors.append(f"{ident}: invalid metric unit/direction")
                         value=metric.get("value")
-                        if isinstance(value, bool) or not isinstance(value, (int, float)):
+                        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
                             errors.append(f"{ident}: metric must contain measured numeric value")
-                key=(run.get("experiment_id"),run.get("attempt"))
-                if key in run_artifacts:
-                    errors.append(f"{ident}: duplicate experiment attempt {key}")
-                run_artifacts.add(key)
-            if run.get("status") == "invalidated" and not run.get("invalidation_reason"):
+             if run.get("status") == "invalidated" and not run.get("invalidation_reason"):
                 errors.append(f"{ident}: invalidated run needs a reason")
         if item.get("type") == "DecisionTrace":
             trace = item.get("decision_trace")
@@ -81,11 +100,15 @@ def validate_v03(state):
             else:
                 if not all(isinstance(v, str) and v.strip() for v in trace["options"]):
                     errors.append(f"{ident}: invalid option")
+            if trace.get("status") == "documented" and trace.get("selected") not in trace.get("options", []):
+                errors.append(f"{ident}: documented trace must select a recorded option")
             if not isinstance(trace.get("rationale"), str) or not trace["rationale"].strip():
                 errors.append(f"{ident}: decision needs rationale or an explicit unknown")
             for key,valid in (("event_ids", events),("session_ref_ids",sessions),("claim_ids",items),("run_ids",items)):
                 values=trace.get(key,[])
-                if not isinstance(values,list) or len(values)!=len(set(values)) or any(v not in valid for v in values):
+                if (not isinstance(values,list) or
+                    any(not isinstance(v,str) for v in values) or
+                    len(values)!=len(set(values)) or any(v not in valid for v in values)):
                     errors.append(f"{ident}: invalid {key}")
             for rid in trace.get("run_ids",[]):
                 if rid in items and items[rid].get("type")!="ExperimentRun":
