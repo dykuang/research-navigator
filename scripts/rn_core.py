@@ -14,8 +14,8 @@ import uuid
 SCHEMA_VERSION = "0.2.0"
 LEGACY_SCHEMA_VERSION = "0.1.0"
 MODULES = ("topic", "literature", "experiment", "pivot", "synthesis")
-TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "Concept", "Source", "PriorWork", "Baseline", "DatasetOrMaterial", "Experiment", "ExperimentPath", "Result", "Claim", "Decision", "Task", "Risk", "Artifact", "ResearchBranch", "Milestone")
-PREFIXES = {"ResearchQuestion":"RQ", "Idea":"IDEA", "Method":"METH", "Hypothesis":"HYP", "Concept":"CON", "Source":"SRC", "PriorWork":"WORK", "Baseline":"BASE", "DatasetOrMaterial":"DATA", "Experiment":"EXP", "ExperimentPath":"PATH", "Result":"RES", "Claim":"CLAIM", "Decision":"DEC", "Task":"TASK", "Risk":"RISK", "Artifact":"ART", "ResearchBranch":"BR", "Milestone":"MILE"}
+TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "Concept", "Source", "PriorWork", "Baseline", "DatasetOrMaterial", "Experiment", "ExperimentPath", "Result", "Claim", "Decision", "Task", "Risk", "Artifact", "ResearchBranch", "Milestone", "ExperimentRun", "DecisionTrace")
+PREFIXES = {"ResearchQuestion":"RQ", "Idea":"IDEA", "Method":"METH", "Hypothesis":"HYP", "Concept":"CON", "Source":"SRC", "PriorWork":"WORK", "Baseline":"BASE", "DatasetOrMaterial":"DATA", "Experiment":"EXP", "ExperimentPath":"PATH", "Result":"RES", "Claim":"CLAIM", "Decision":"DEC", "Task":"TASK", "Risk":"RISK", "Artifact":"ART", "ResearchBranch":"BR", "Milestone":"MILE", "ExperimentRun":"RUN", "DecisionTrace":"TRACE"}
 WORKFLOW = ("to-be-determined", "ready-for-agent", "to-be-implemented", "in-progress", "blocked", "done", "no-further-considered")
 EPISTEMIC = ("uncertain", "hypothesis", "source-backed", "experimentally-supported", "contradicted", "not-applicable")
 REVIEW = ("needs-user-confirmation", "user-confirmed", "not-required", "rejected")
@@ -28,7 +28,7 @@ ACTORS = ("agent", "user", "mentor", "tool")
 ACCESS = ("full-text", "abstract", "secondary", "user-provided", "unavailable")
 VERIFICATIONS = ("unverified", "metadata-checked", "primary-inspected")
 FAILURE = ("theory", "method", "implementation", "data", "evaluation", "resources", "unknown")
-CRITICAL_TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "PriorWork", "Baseline", "Experiment", "Claim", "Result", "ResearchBranch", "Milestone")
+CRITICAL_TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "PriorWork", "Baseline", "Experiment", "Claim", "Result", "ResearchBranch", "Milestone", "ExperimentRun", "DecisionTrace")
 CANDIDATE_TYPES = ("ResearchQuestion", "Idea", "Method", "Hypothesis", "Baseline", "ExperimentPath", "Task", "ResearchBranch")
 
 class ResearchError(ValueError):
@@ -464,6 +464,8 @@ def validate_state(s,strict=False):
     # v0.2 domain validators inspect additive, optional sidecars.
     from rn_v02 import validate_v02
     errors.extend(validate_v02(s))
+    from rn_v03 import validate_v03
+    errors.extend(validate_v03(s))
     if strict and errors:raise ResearchError("状态校验失败:\n- "+"\n- ".join(errors))
     return errors
 
