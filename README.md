@@ -1,6 +1,6 @@
-# Research Navigator · v0.3 Scientific Reasoning Graph (development branch)
+# Research Navigator · v0.4.0 Research Decision Intelligence
 
-> v0.2 Research Canvas has merged to `main`; v0.3 is currently under development on `feat/v0.3-scientific-reasoning-graph`. Stable release is **not** claimed.
+> v0.4.0 is the release target. Scientific decision outputs are read-only advisory projections, not automatic experiment execution or scientific verification. See [v0.4 UAT](docs/uat-report-v0.4-2026-11-23.md).
 
 科研项目的交互式规划 + 可追溯状态 + 原生离线 HTML 工作台。面向五个互相联动的模块：选题、文献与基线、实验、路线调整、总结。核心能力是 `active / parked / quarantined / retired / under-revival-review` 的受控研究记忆，以及明确定义的证据/人审/结果状态。
 
@@ -97,9 +97,9 @@ python -m unittest discover -s evals -p 'test_*.py' -v
 
 MIT License，见 [LICENSE](LICENSE)。
 
-## v0.4 开发分支：Research Decision Intelligence
+## v0.4 Research Decision Intelligence
 
-本功能目前在 `feat/v0.4-research-decision-intelligence` 开发，**不代表 v0.4 稳定发布**。在 v0.3 的可验证 Run、Scoped Evidence、DecisionTrace 基础上，新增只读决策分析：
+v0.4.0 在已有 v0.3 科学推理图上新增只读决策辅助，正式发布前需完成合并和发布检查。在 v0.3 的可验证 Run、Scoped Evidence、DecisionTrace 基础上，新增只读决策分析：
 
 - `python scripts/v04_project.py PROJECT_ROOT gaps` — 依赖、证据、里程碑验收缺口；
 - `python scripts/v04_project.py PROJECT_ROOT opportunities` — 与可证伪观察相关的最低成本检查草案（**成本未知，不保证有效或获准执行**）；
