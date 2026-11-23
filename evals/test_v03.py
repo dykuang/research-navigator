@@ -12,8 +12,8 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from rn_core import (ResearchError, add_item, add_relation, add_source,
-                     init_project, load, paths, validate_state)
-from rn_domain import link_evidence
+                     change_status, init_project, load, paths, validate_state)
+from rn_domain import link_evidence, create_branch
 from rn_reasoning import (create_run, record_run, invalidate_run, analyze_claim,
                           create_decision_trace, replay_decision)
 from graph_projection import project_graph
@@ -211,6 +211,56 @@ class ResearchReasoningV03(unittest.TestCase):
         row=next(x for x in state["items"] if x["id"]==pair["run"]["id"])
         row["run"]["artifact_sha256"]=""
         self.assertTrue(any("artifact_sha256" in x for x in validate_state(state)))
+
+
+    def test_archived_branch_rejects_new_run_but_does_not_archive_shared_baseline(self):
+        branch_a=create_branch(self.root,"Route A","Toy A",["Stop if invalid"])
+        branch_b=create_branch(self.root,"Route B","Toy B",["Stop if invalid"])
+        add_relation(self.root,self.exp["id"],branch_a["id"],"member-of")
+        add_relation(self.root,self.baseline["id"],branch_a["id"],"member-of")
+        add_relation(self.root,self.baseline["id"],branch_b["id"],"member-of")
+        change_status(self.root,branch_a["id"],"lifecycle_status","parked",
+                      "user parks weak route",actor="user",failure_scope="toy A only",
+                      revival_triggers="new independent data")
+        before=load(self.root)
+        with self.assertRaisesRegex(ResearchError,"archived or review-blocked ResearchBranch"):
+            create_run(self.root,self.exp["id"],"forbidden",1)
+        self.assertEqual(load(self.root),before)
+        state=load(self.root)
+        by={x["id"]:x for x in state["items"]}
+        self.assertEqual(by[self.baseline["id"]]["impact_status"],"current")
+        self.assertEqual(by[branch_b["id"]]["lifecycle_status"],"active")
+
+    def test_run_planned_before_branch_park_cannot_be_recorded_after(self):
+        branch=create_branch(self.root,"Route A","Toy",["Stop if invalid"])
+        add_relation(self.root,self.exp["id"],branch["id"],"member-of")
+        run=create_run(self.root,self.exp["id"],"planned before archive",1)
+        logfile=self.root/"toy.log";logfile.write_text("SYNTHETIC FIXTURE",encoding="utf-8")
+        change_status(self.root,branch["id"],"lifecycle_status","parked",
+                      "user parks route",actor="user",failure_scope="toy only",
+                      revival_triggers="new data")
+        before=load(self.root)
+        with self.assertRaisesRegex(ResearchError,"archived or review-blocked ResearchBranch"):
+            record_run(self.root,run["id"],dataset="toy",protocol="toy",code_revision="synthetic",
+                       seed=7,artifact_path="toy.log",observation="toy only",
+                       outcome="inconclusive",metrics=[],
+                       started_at="2026-11-23T08:00:00+08:00",
+                       ended_at="2026-11-23T08:01:00+08:00",synthetic=True)
+        self.assertEqual(load(self.root),before)
+        self.assertEqual(load(self.root)["project"]["schema_version"],"0.2.0")
+
+    def test_nested_branch_park_blocks_run_without_affecting_others(self):
+        outer=create_branch(self.root,"Nested outer","Outer",["Stop"])
+        inner=create_branch(self.root,"Nested inner","Inner",["Stop"])
+        add_relation(self.root,inner["id"],outer["id"],"member-of")
+        add_relation(self.root,self.exp["id"],inner["id"],"member-of")
+        planned=create_run(self.root,self.exp["id"],"allowed when active",1)
+        self.assertEqual(planned["run"]["status"],"planned")
+        change_status(self.root,outer["id"],"lifecycle_status","quarantined",
+                      "user quarantines parent",actor="user",failure_scope="parent conditions",
+                      revival_triggers="independent review")
+        with self.assertRaisesRegex(ResearchError,"archived or review-blocked ResearchBranch"):
+            create_run(self.root,self.exp["id"],"blocked",2)
 
 
 if __name__=="__main__":
