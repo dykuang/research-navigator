@@ -419,6 +419,10 @@ function exampleParams(op){
     "link-session":{session_ref_id:"SESS-0001",entity_id:id,role:"discussion"},
     "unlink-session":{session_ref_id:"SESS-0001",entity_id:id}
   };
+  if(op==="approve-revival-candidate"&&selected&&selected.type==="ResearchBranch"){
+    examples[op].goal="Re-evaluate the route under independently changed conditions";
+    examples[op].stop_conditions=["Stop if the new independent baseline is not reproducible"];
+  }
   return examples[op];
 }
 function updateEditorExample(){
