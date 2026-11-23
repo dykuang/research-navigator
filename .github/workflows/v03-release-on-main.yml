@@ -7,6 +7,7 @@ on:
       - completed
 permissions:
   contents: write
+  pull-requests: read
 jobs:
   publish:
     name: Verify merge SHA, tag and publish official v0.3.0
@@ -44,8 +45,11 @@ jobs:
           expected = pr["merge_commit_sha"]
           tested = os.environ["TESTED_SHA"]
           main = api("GET", "/git/ref/heads/main")["object"]["sha"]
-          if tested != main or expected != main:
-              raise SystemExit("Refusing release: tested SHA / main / PR merge SHA differ")
+          if tested != main:
+              raise SystemExit("Refusing release: tested SHA / main differ")
+          ancestry = api("GET", "/compare/" + expected + "..." + main)
+          if ancestry.get("status") not in ("identical", "ahead"):
+              raise SystemExit("Refusing release: v0.3 PR merge must be an ancestor of main")
           release_tag = "v0.3.0"
           tagged = api("GET", "/git/ref/tags/"+release_tag, missing_ok=True)
           if tagged and tagged["object"]["sha"] != main:
