@@ -35,6 +35,12 @@ def build_canvas(root):
     dest=project_root/"research"/"canvas"/"index.html"
     dest.parent.mkdir(parents=True,exist_ok=True)
     from rn_core import atomic_text
+    # Only offline export carries the read-only decision snapshot.
+    # The authenticated local bridge remains responsible for interactive proposals.
+    from build_decision import build as build_decision
+    build_decision(root)
+    html=html.replace('<a href="../dashboard/index.html">返回经典工作台</a>',
+                      '<a href="decisions.html">研究决策</a> · <a href="../dashboard/index.html">返回经典工作台</a>')
     atomic_text(dest,html)
     return dest
 
