@@ -88,6 +88,48 @@ class ArchiveCanvasTests(unittest.TestCase):
         self.assertEqual(m["impact_status"],"needs-review")
         self.assertEqual(next(i for i in after["items"] if i["id"]==self.base["id"])["lifecycle_status"],"active")
         self.assertEqual(next(i for i in after["items"] if i["id"]==self.branches[1]["id"])["impact_status"],"current")
+    def test_revival_of_branch_requires_fresh_goal_and_stop_conditions(self):
+        branch = self.branches[0]
+        previous_metadata = next(i for i in load(self.root)["items"]
+                                 if i["id"] == branch["id"])["branch"]
+        baseline_before = next(i for i in load(self.root)["items"]
+                               if i["id"] == self.base["id"])
+        self.approve("archive-route", {"item_id": branch["id"],
+            "lifecycle": "parked", "failure_scope": "Weak synthetic baseline",
+            "revival_triggers": "New independent data"})
+        self.approve("begin-revival-review", {
+            "item_id": branch["id"], "question": "Can a new independent dataset help?",
+            "new_conditions": "Different data distribution"})
+        old = load(self.root)
+        args = {"item_id": branch["id"], "title": "New Branch A v2",
+                "new_conditions": "Fresh independent dataset",
+                "approval_note": "Second deliberate authorization"}
+        for invalid in (args, {**args, "goal": "New objective"},
+                        {**args, "goal": "New objective", "stop_conditions": []},
+                        {**args, "goal": " ", "stop_conditions": ["Stop if invalid"]}):
+            with self.subTest(invalid=invalid), self.assertRaises(ResearchError):
+                queue_proposal(self.root, self.payload("approve-revival-candidate", invalid))
+            self.assertEqual(load(self.root), old)
+        new_goal = "Independently check the next route"
+        new_stops = ["No reproducible gain over new control"]
+        self.approve("approve-revival-candidate", {
+            **args, "goal": new_goal, "stop_conditions": new_stops})
+        current = load(self.root)
+        parent = next(i for i in current["items"] if i["id"] == branch["id"])
+        candidate = next(i for i in current["items"] if
+                         i.get("derived_from") == branch["id"])
+        self.assertEqual(parent["lifecycle_status"], "parked")
+        self.assertEqual(parent["branch"], previous_metadata)
+        self.assertEqual(candidate["type"], "ResearchBranch")
+        self.assertEqual(candidate["branch"]["goal"], new_goal)
+        self.assertEqual(candidate["branch"]["stop_conditions"], new_stops)
+        self.assertEqual(candidate["epistemic_status"], "hypothesis")
+        self.assertEqual(candidate["review_status"], "needs-user-confirmation")
+        self.assertEqual(next(i for i in current["items"]
+                              if i["id"] == self.base["id"]), baseline_before)
+        self.assertEqual(next(i for i in current["items"]
+                              if i["id"] == self.mile["id"])["impact_status"], "needs-review")
+
     def test_cancel_review_and_reject_invalid_tombstone(self):
         before=load(self.root)
         with self.assertRaises(ResearchError):
