@@ -13,7 +13,7 @@ import json
 
 from rn_core import ResearchError, load, validate_state
 
-VIEWS = ("all", "planning", "archive", "risk", "evidence", "routes", "outputs")
+VIEWS = ("all", "planning", "archive", "risk", "evidence", "routes", "outputs", "reasoning")
 NODE_TYPES = ("item", "source", "evidence-link", "session-ref")
 NAMESPACE = {"items": "item", "sources": "source",
              "evidence_links": "evidence", "session_refs": "session"}
@@ -46,6 +46,8 @@ def _item_node(item):
         "derived_from": item.get("derived_from"),
         "branch": item.get("branch") if kind == "ResearchBranch" else None,
         "milestone": item.get("milestone") if kind == "Milestone" else None,
+        "run": item.get("run") if kind == "ExperimentRun" else None,
+        "decision_trace": item.get("decision_trace") if kind == "DecisionTrace" else None,
         "evidence_refs": item.get("evidence_refs", []),
         "artifact_path": item.get("artifact_path", ""),
         "observation": item.get("observation", ""),
@@ -58,7 +60,8 @@ def _item_node(item):
         "revision": item.get("revision"),
         "statuses": {key: item.get(key) for key in keys},
         "metadata": metadata,
-        "actionable": (item.get("lifecycle_status") == "active"
+        "actionable": (kind not in ("ExperimentRun", "DecisionTrace") and
+                        item.get("lifecycle_status") == "active"
                        and item.get("impact_status") == "current"
                        and item.get("review_status") != "rejected"
                        and item.get("workflow_status") not in
@@ -186,6 +189,25 @@ def _nodes_edges(state):
                      "session:" + session["roles"][entity_id],
                      "session_refs",
                      {"id": session["id"], "entity_id": entity_id})
+    # v0.3: read-only typed provenance links; none mutate canonical state.
+    for item in state["items"]:
+        if item["type"] == "ExperimentRun":
+            run = item["run"]
+            if run.get("result_id"):
+                add_edge(_key("items", item["id"]),
+                         _key("items", run["result_id"]), "produced-result",
+                         "items.run", {"id": item["id"], "field": "result_id"})
+        if item["type"] == "DecisionTrace":
+            trace = item["decision_trace"]
+            for field, relation_type, collection in (
+                    ("claim_ids", "reviewed-claim", "items"),
+                    ("run_ids", "reviewed-run", "items"),
+                    ("session_ref_ids", "linked-session", "session_refs")):
+                for ident in sorted(set(trace.get(field, []))):
+                    add_edge(_key("items", item["id"]),
+                             _key(collection, ident), relation_type,
+                             "items.decision_trace",
+                             {"id": item["id"], "field": field, "ref": ident})
     return nodes, edges
 
 
@@ -232,6 +254,13 @@ def project_graph(state, *, view="all", module=None, branch=None,
         active &= {nid for nid, n in nodes.items()
                    if n["type"] in ("Milestone", "Claim", "Artifact",
                                     "Result", "Decision", "Source", "EvidenceLink")}
+
+    if view == "reasoning":
+        active &= {nid for nid, n in nodes.items()
+                    if n["type"] in ("ResearchQuestion", "Hypothesis", "Experiment",
+                                     "ExperimentRun", "Result", "Claim", "EvidenceLink",
+                                     "Source", "Decision", "DecisionTrace",
+                                     "Milestone", "SessionRef")}
 
     if module:
         active &= {nid for nid, n in nodes.items()
