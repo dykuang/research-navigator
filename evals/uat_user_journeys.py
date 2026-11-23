@@ -217,6 +217,8 @@ def branch_revival_boundary():
         payload=proposal(root,"approve-revival-candidate",{
             "item_id":branch["id"],"title":"重要路线 B v2",
             "new_conditions":"新的独立复现实验条件",
+            "goal":"在新独立材料和新版协议下复现路线 B",
+            "stop_conditions":["新的基线不能独立复现时停止"],
             "approval_note":"第二次独立合成批准"})
         try:
             preview_proposal(root,payload)
