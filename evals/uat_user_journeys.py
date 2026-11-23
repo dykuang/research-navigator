@@ -280,7 +280,18 @@ def mobile_viewport(browser):
                 page.screenshot(path=str(ARTIFACTS/"uat-mobile-390.png"),full_page=True)
                 assert page.locator("#mobileInspectorToggle").is_visible()
                 page.locator(".node").first.click()
-                assert page.locator("#details").is_visible()
+                debug=page.evaluate("""() => {
+                  const ins=document.getElementById('inspector');
+                  const det=document.getElementById('details');
+                  const c=getComputedStyle(ins);
+                  const d=getComputedStyle(det);
+                  return {vw:innerWidth,inner:ins.className,visible:!!det.getClientRects().length,
+                          position:c.position,display:c.display,visibility:c.visibility,
+                          pointerEvents:c.pointerEvents,transform:c.transform,
+                          detailsText:det.textContent.slice(0,100),detailsVisibility:d.visibility};
+                }""")
+                print("MOBILE_INSPECTOR_DEBUG="+json.dumps(debug,ensure_ascii=False),flush=True)
+                assert page.locator("#details").is_visible(), debug
                 assert page.locator("#sessionProviderFilter").is_visible()
                 assert page.locator("#semanticOperation").is_visible()
                 assert page.locator("#previewSemantic").is_enabled()
