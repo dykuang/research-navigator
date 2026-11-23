@@ -52,3 +52,19 @@ jobs:
           python scripts/validate_state.py smoke
           python scripts/build_dashboard.py smoke
           python scripts/graph_projection.py smoke --view reasoning
+
+  reasoning-browser:
+    name: Chromium / v0.3 reasoning inspector
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright and Chromium
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Real browser reasoning nodes and inspector
+        run: python evals/browser_check_v03_reasoning.py
