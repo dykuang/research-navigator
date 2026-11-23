@@ -14,7 +14,7 @@ import secrets
 import sys
 from urllib.parse import urlsplit
 
-from rn_core import ResearchError, load, validate_state
+from rn_core import ResearchError, load, validate_state, now
 from rn_proposals import (queue_proposal, inspect_proposal, approve_proposal,
                           preview_proposal, proposal_status)
 from graph_projection import project_graph
@@ -180,6 +180,36 @@ def create_handler(root, token, port):
             return True
 
         def do_GET(self):
+            if self.path == "/dashboard/index.html":
+                # The response is a shell with no scientific data, even before
+                # token verification; authenticated JS requests /api/dashboard.
+                if self.headers.get("Host") != allowed_host:
+                    return self._send(403, {"error":"Invalid Host"})
+                if self.headers.get("Sec-Fetch-Site","same-origin") not in ("same-origin","none"):
+                    return self._send(403, {"error":"Cross-site request forbidden"})
+                template = Path(__file__).resolve().parent.parent/"templates"/"dashboard.html"
+                nonce = secrets.token_urlsafe(18)
+                page = (template.read_text(encoding="utf-8")
+                        .replace("__EMBEDDED_STATE_JSON__", "null")
+                        .replace("__DASHBOARD_NONCE__", nonce))
+                self._headers(200, content_type="text/html", nonce=nonce)
+                self.wfile.write(page.encode("utf-8"))
+                return
+            if self.path == "/api/dashboard":
+                if not self._guard():
+                    return
+                try:
+                    state = load(root)
+                    validate_state(state, strict=True)
+                    self._send(200, {
+                        "project":state["project"],"items":state["items"],
+                        "relations":state["relations"],"sources":state["sources"],
+                        "events":state["events"][-80:],"generated_at":now(),
+                        "interactive_edits":False,
+                        "graph_engine":"native SVG fallback (Archify schema not assumed)"})
+                except (ResearchError,ValueError,OSError) as exc:
+                    self._send(409,{"error":str(exc)})
+                return
             if self.path == "/canvas":
                 # Public shell contains NO project data. Only authenticated
                 # X-RN-Token /api/graph requests return project information.
