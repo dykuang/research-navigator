@@ -81,6 +81,7 @@ button:disabled{opacity:.5;cursor:default}
 <label for="view">视图</label><select id="view">
 <option value="all">探索 · All</option><option value="evidence">证据 · Evidence</option>
 <option value="routes">研究路线 · Routes</option><option value="outputs">成果 · Outputs</option>
+<option value="reasoning">科学推理 · Reasoning</option>
 <option value="planning">当前规划 · Planning</option><option value="archive">归档探索 · Archive</option>
 </select>
 <label for="search">查找实体或 ID</label><input id="search" placeholder="输入关键词 / 节点 ID" type="search">
@@ -148,9 +149,11 @@ const $=id=>document.getElementById(id);
 const viewport=$("workspace"),world=$("world"),svg=$("edges"),cards=$("nodes"),minimap=$("minimap");
 const NS="http://www.w3.org/2000/svg", WIDTH=190, HEIGHT=94;
 const TYPES={
-  all:null,evidence:new Set(["Claim","Result","Source","EvidenceLink","Hypothesis","Milestone"]),
+  all:null,evidence:new Set(["Claim","Result","Source","EvidenceLink","Hypothesis","Milestone","ExperimentRun"]),
   routes:new Set(["ResearchBranch","Milestone","ResearchQuestion","Idea","Hypothesis","Experiment","Result","Baseline","Task"]),
-  outputs:new Set(["Milestone","Claim","Artifact","Result","Decision","Source","EvidenceLink"])
+  outputs:new Set(["Milestone","Claim","Artifact","Result","Decision","Source","EvidenceLink","ExperimentRun","DecisionTrace"]),
+  reasoning:new Set(["ResearchQuestion","Hypothesis","Experiment","ExperimentRun","Result","Claim",
+                     "EvidenceLink","Source","Decision","DecisionTrace","Milestone","SessionRef"])
 };
 const state={positions:{},camera:{x:210,y:180,z:1},selected:null,hidden:new Set(),pinnedGroups:new Set(),drag:null,visible:new Set(),view:"all"};
 let snapshotKey="rn-canvas:"+graph.project_id+":views";
@@ -303,6 +306,12 @@ function selectNode(id){
   section("研究与证据信息",JSON.stringify(node.metadata||{},null,2));
   if(node.metadata&&node.metadata.decision_history)
     section("历史决策与归档背景（仅参考）",JSON.stringify(node.metadata.decision_history,null,2));
+  if(node.type==="ExperimentRun"&&node.metadata&&node.metadata.run)
+    section("实验运行溯源（记录不是科学验证）",JSON.stringify(node.metadata.run,null,2));
+  if(node.type==="DecisionTrace"&&node.metadata&&node.metadata.decision_trace){
+    section("决策溯源（不会还原缺失对话）",JSON.stringify(node.metadata.decision_trace,null,2));
+    section("证据边界","本节点引用的是已有事件 ID / SessionRef，不是完整对话重建；审批和结论仍需人工核验。");
+  }
   if(node.metadata&&node.metadata.archive)
     section("失败范围 / 不确定性 / 回收触发条件",JSON.stringify(node.metadata.archive,null,2));
   if(node.metadata&&node.metadata.revival)
