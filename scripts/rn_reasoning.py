@@ -210,12 +210,8 @@ def create_decision_trace(root, *, decision_id, title, scope, options, selected,
                                  "approval_event_id":approval_event_id}
         state["relations"].append({"from":trace["id"],"to":decision_id,"type":"depends-on"})
         trace["depends_on"].append(decision_id)
-        for kind,key in (("claim_ids","claim"),("run_ids","run")):
-            for ident in trace["decision_trace"][kind]:
-                state["relations"].append({"from":trace["id"],"to":ident,"type":"references"})
-        # Store typed trace references in metadata; the canonical relations schema
-        # does not include 'references' (which is only a projection edge).
-        state["relations"]=[x for x in state["relations"] if x.get("type")!="references"]
+        # Claim/Run/SessionRef references are typed links in trace metadata.
+        # Graph projection exposes them without modifying canonical relation types.
         write(root,state,[_event("decision-trace-created",trace["id"],actor,
                                  "Provenance references only; no transcript inferred",trace["decision_trace"])],
               expected_revision=expected_revision)
