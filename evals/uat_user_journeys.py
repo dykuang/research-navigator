@@ -250,14 +250,19 @@ def live_classic_navigation(browser):
                 href=page.get_by_role("link",name="返回经典工作台").get_attribute("href")
                 target=urljoin(page.url,href)
                 response=page.request.get(target)
-                status=response.status
-                if status==200 and "text/html" in response.headers.get("content-type",""):
-                    record(name,"pass","返回经典工作台应打开真正可用的 HTML 页面",
-                           f"HTTP {status} {target}")
-                else:
-                    record(name,"issue","从已连接的 Canvas 返回经典工作台仍可用",
-                           f"点击链接会访问 {target}，HTTP {status}（非正常 HTML 工作台）",
-                           "Broken in-app navigation; offline file dashboard is not served at this live URL.")
+                assert response.status==200 and "text/html" in response.headers.get("content-type","")
+                shell=response.text()
+                assert "导航回退用户" not in shell, "Unauthenticated dashboard shell leaked project name"
+                denied=page.request.get(origin+"/api/dashboard")
+                assert denied.status==403, "Unauthenticated API disclosed project metadata"
+                page.get_by_role("link",name="返回经典工作台").click()
+                page.get_by_text("导航回退用户",exact=True).wait_for(timeout=5000)
+                assert page.locator("#relationSvg").count()==1
+                assert page.locator("#rn-data").text_content()=="null"
+                page.locator('[data-view="graph"]').click()
+                assert page.locator("#relationSvg g").count()>=1
+                record(name,"pass","Connected Canvas → classical dashboard loads read-only graph with a protected API",
+                       "实际浏览器点击返回工作台成功；匿名 shell 不含项目名称，未授权 API 返回 403")
             finally:
                 page.close()
 
@@ -273,15 +278,19 @@ def mobile_viewport(browser):
                 page.goto(origin+"/canvas#token=mobile-uat-token")
                 page.locator(".node").first.wait_for()
                 page.screenshot(path=str(ARTIFACTS/"uat-mobile-390.png"),full_page=True)
-                display=page.locator("#inspector").evaluate("(el)=>getComputedStyle(el).display")
-                if display=="none":
-                    record(name,"issue","小屏幕应能访问节点详情、会话与提案编辑，或提示仅限桌面",
-                           "宽度 390px 时整个 #inspector 为 display:none，节点详情/SessionRef/提案界面不可操作",
-                           "The layout hides the entire right panel at max-width:680px.")
-                else:
-                    page.locator(".node").first.click()
-                    assert page.locator("#details").is_visible()
-                    record(name,"pass","移动端科研详情可访问","右侧面板可见")
+                assert page.locator("#mobileInspectorToggle").is_visible()
+                page.locator(".node").first.click()
+                assert page.locator("#details").is_visible()
+                assert page.locator("#sessionProviderFilter").is_visible()
+                assert page.locator("#semanticOperation").is_visible()
+                assert page.locator("#previewSemantic").is_enabled()
+                assert page.locator("#mobileInspectorToggle").get_attribute("aria-expanded")=="true"
+                page.locator("#closeMobileInspector").click()
+                assert page.locator("#mobileInspectorToggle").get_attribute("aria-expanded")=="false"
+                page.locator("#mobileInspectorToggle").click()
+                assert page.locator("#semanticParams").is_visible()
+                record(name,"pass","小屏可选节点查看详情、SessionRef 和受控提案",
+                       "390px 移动 Chromium 上抽屉可打开/关闭，查看证据和编辑器")
             finally:
                 page.close()
 
