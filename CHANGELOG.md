@@ -47,3 +47,11 @@ All notable Research Navigator changes are recorded here. Development changes li
 - This is a **release candidate**; do not claim `v0.2` has shipped on `main` or that a formal GitHub Release/tag exists until it is explicitly created and verified.
 
 See [v0.2 release checklist](docs/release-v0.2.md), [Canvas guide](references/canvas-guide.md), and [Windows/Codex test matrix](references/windows-codex-qa.md).
+
+## v0.4.0 — Research Decision Intelligence (2026-11-23)
+
+- Read-only evidence-gap, minimal discriminating-check proposals and scoped risk advisories atop v0.3 state.
+- Archive review watchlist never activates archived routes or bypasses human review.
+- Mentor decision brief with scientific Milestone evidence gates.
+- Offline Research Canvas decision report and cross-platform CI.
+- Canonical project schema 0.2.0 and v0.3 approvals remain unchanged. Six synthetic multi-round researcher UAT scenarios (24 rounds) and cross-platform CI passed; see docs/uat-report-v0.4-2026-11-23.md.

@@ -50,3 +50,11 @@ conflicts and replay **existing** event IDs linked to research decisions.
 It does **not** execute experiments, auto-verify scientific truth or ingest
 the full Codex conversation. The main Canvas's Reasoning view is read-only
 and cannot approve research claims. See `references/reasoning-v03.md`.
+
+**能否自动选择最佳下一步实验？**
+
+v0.4 决策助手可对当前证据缺口提出待讨论的最低成本区分性检查，但不声称知道真实成功概率、不自动执行实验、不绕过用户审批。使用 `v04_project.py PROJECT_ROOT opportunities`，或在生成的离线 Canvas 的“研究决策”页面查看。
+
+**能否根据新论文自动恢复之前失败的方法？**
+
+不能。v0.4 提供只读复审观察清单，触发条件是否满足仍需来源核实及用户批准；真正回收遵守现有双阶段确认。

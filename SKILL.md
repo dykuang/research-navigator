@@ -117,3 +117,9 @@ python scripts/build_dashboard.py /PROJECT/ROOT
 ## 质量门槛与继续会话
 
 更新后运行 `validate_state.py`，如失败先修复而不是继续推荐；在关键变化后重建看板。若现有文献与定义矛盾，应优先指出冲突并问用户如何解决。会话结束可按 `templates/session-handoff.md` 的格式留下下次执行概要，索引已落盘的实体与决策，不复制整套状态。完整能力与未实现功能见 `README.md`。
+
+## v0.4 · 科研决策智能辅助（只读建议，未获实验执行许可）
+
+当用户询问“下一步做什么、证据不足在哪里、哪条实验最有信息价值、导师需要审核什么”时，优先运行 `python scripts/v04_project.py PROJECT_ROOT brief` 或 `gaps / opportunities / archive`。按需参考 `references/decision-v04.md`，不必开始新项目或回到初始访谈。报告读取 v0.3 权威状态，不写入项目状态、批准实验或解除归档隔离。**任何建议只是用于讨论的假设；信息价值和成本默认为未知，无法用虚构概率/评分替代证据。**
+
+无限画布离线导出后，打开 `research/canvas/decisions.html` 查看证据缺口、低成本区分性检查、导师审查和历史路线复审。画布的科学语义编辑仍需 v0.2 本机提案 → 人工终端批准；不得让代理把离线建议伪装成通过审批的待执行任务。

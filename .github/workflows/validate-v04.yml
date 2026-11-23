@@ -1,0 +1,71 @@
+name: Validate Research Navigator v0.4
+on:
+  push:
+    branches:
+      - feat/v0.4-research-decision-intelligence
+      - main
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  v04-python:
+    name: Python / ${{ matrix.os }} / ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.10"
+          - os: ubuntu-latest
+            python: "3.12"
+          - os: windows-latest
+            python: "3.12"
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Python compile
+        run: python -m compileall -q scripts
+      - name: v0.1 to v0.4 all regression tests
+        run: python -m unittest discover -s evals -p "test_*.py" -v
+      - name: v0.3 synthetic multiround
+        run: python evals/uat_v03_multiround.py
+      - name: v0.4 synthetic researcher journey
+        run: python evals/uat_v04_multiround.py
+      - name: Six owner-like research journeys with automatic fixture cleanup
+        run: python evals/uat_v04_researcher_rounds.py
+      - name: CLI smoke & explicit data isolation
+        shell: bash
+        run: |
+          python scripts/update_project.py init smoke-v04 --name "SYNTHETIC CLI UAT" --question "Uncertain research question"
+          python scripts/update_project.py add-item smoke-v04 --type Hypothesis --title "SYNTHETIC not tested" --module topic
+          python scripts/v04_project.py smoke-v04 gaps --output smoke-v04/report.json
+          python scripts/v04_project.py smoke-v04 opportunities
+          python scripts/v04_project.py smoke-v04 archive
+          python scripts/v04_project.py smoke-v04 brief --format markdown --output smoke-v04/advisor.md
+          python scripts/build_dashboard.py smoke-v04
+          python scripts/validate_state.py smoke-v04
+  v04-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Chromium and Playwright
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Offline v0.4 decision board and mobile controls
+        run: python evals/browser_check_v04.py
+      - name: v0.3 reasoning inspector regression
+        run: python evals/browser_check_v03_reasoning.py
