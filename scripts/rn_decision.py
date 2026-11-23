@@ -53,13 +53,18 @@ def gaps(state):
     source_ids = {s["id"] for s in state["sources"]}
     for x in sorted(state["items"], key=lambda i: i["id"]):
         typ = x["type"]
+        # Archived research is historical evidence, not an active task queue.
+        # Formal revival review remains visible until a person resolves it.
+        lifecycle=x.get("lifecycle_status")
+        if lifecycle not in (ACTIVE, "under-revival-review"):
+            continue
         if x.get("impact_status") != "current":
             out.append(_gap("DEPENDENCY_NEEDS_REVIEW", x,
                 "上游前提或来源状态改变：复核相关决定和实验范围。", "blocker"))
         if x.get("review_status") == "needs-user-confirmation":
             out.append(_gap("HUMAN_REVIEW_PENDING", x,
                 "需要用户/导师确认；批准不等于科学上得到验证。"))
-        if x.get("lifecycle_status") != ACTIVE:
+        if lifecycle != ACTIVE:
             continue
         if typ == "Claim":
             valid = [e for e in links[x["id"]] if
@@ -84,6 +89,16 @@ def gaps(state):
             runs = [r for r in state["items"] if
                     r["type"] == "ExperimentRun" and
                     r.get("run", {}).get("experiment_id") == x["id"]]
+            # A negative, mixed or inconclusive *recorded* Run needs
+            # diagnosis in its original context. Invalidated logs are excluded.
+            questionable=[r for r in runs if
+                r.get("run", {}).get("status")=="recorded" and
+                r.get("outcome") in ("negative","inconclusive","mixed")]
+            if questionable:
+                out.append(_gap("EXPERIMENT_NEEDS_NEGATIVE_INTERPRETATION",x,
+                    "存在负面/混合/无结论的实际运行记录；先检查样本、对照、条件和失效可能，不能直接断言方法普遍无效。",
+                    "review", [r["id"] for r in questionable],
+                    [r["run"].get("result_id") for r in questionable if r["run"].get("result_id")]))
             if not runs:
                 out.append(_gap("EXPERIMENT_NO_REGISTERED_RUN", x,
                     "实验已有方案，但没有登记任何运行；计划不等于执行。", "review"))
@@ -144,6 +159,9 @@ def opportunities(state, cost="unknown"):
         "EXPERIMENT_RUNS_INVALIDATED": ("设计修正后的最小复现实验",
             "如何在修正失效原因后验证原观察？",
             "experiment", "记录失效原因、改变条件并重新检查"),
+        "EXPERIMENT_NEEDS_NEGATIVE_INTERPRETATION": ("诊断负面或不确定实验结果",
+            "如何区分实现故障、评价条件差异、统计不充分和真正无收益？",
+            "experiment", "先检查原始运行日志、协议与样本；必要时提出最低成本复核，不能自动重跑"),
         "MILESTONE_GATE_PENDING": ("补充验收条件所需证据",
             "什么观察才足以达到此项里程碑标准？",
             "synthesis", "先完成证据收集，再交给人类审阅"),
