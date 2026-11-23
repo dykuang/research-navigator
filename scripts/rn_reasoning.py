@@ -45,6 +45,39 @@ def _unique_attempt(state, exp_id, attempt, exclude=None):
         raise ResearchError("duplicate experiment run attempt")
 
 
+def _require_active_branch_context(state, experiment_id):
+    """Do not open or finish attempts that belong to archived/review-stale routes.
+
+    Transitive ResearchBranch membership is allowed; a single unsafe attached
+    route requires explicit research review instead of implicit continuation.
+    Shared independent Baselines and unrelated Branches are never modified.
+    """
+    items = {i["id"]: i for i in state["items"]}
+    members = {}
+    for edge in state["relations"]:
+        if edge["type"] == "member-of":
+            members.setdefault(edge["from"], set()).add(edge["to"])
+    pending = [experiment_id]
+    seen = set()
+    while pending:
+        current = pending.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        for branch_id in members.get(current, ()):
+            branch = items.get(branch_id)
+            if not branch or branch["type"] != "ResearchBranch":
+                raise ResearchError("Experiment has an invalid ResearchBranch membership")
+            if (branch["lifecycle_status"] != "active" or
+                    branch["impact_status"] != "current" or
+                    branch["review_status"] == "rejected"):
+                raise ResearchError(
+                    "Experiment is linked to an archived or review-blocked ResearchBranch: "
+                    + branch_id + "; request formal review or use a new approved route"
+                )
+            pending.append(branch_id)
+
+
 def create_run(root, experiment_id, title, attempt, actor="agent", *, expected_revision=None):
     require(actor, ACTORS, "actor")
     if not isinstance(attempt, int) or isinstance(attempt, bool) or attempt < 1:
@@ -56,6 +89,7 @@ def create_run(root, experiment_id, title, attempt, actor="agent", *, expected_r
             raise ResearchError("run must belong to an Experiment")
         if experiment["lifecycle_status"] != "active" or experiment["impact_status"] != "current":
             raise ResearchError("cannot plan an unreviewed or archived Experiment")
+        _require_active_branch_context(state, experiment_id)
         _unique_attempt(state, experiment_id, attempt)
         item = new_item(state, "ExperimentRun", title, "experiment",
                         actor=actor, epistemic="uncertain",
@@ -109,8 +143,9 @@ def record_run(root, run_id, *, dataset, protocol, code_revision, seed,
         if item["type"]!="ExperimentRun" or item["run"]["status"]!="planned":
             raise ResearchError("run must exist and be planned; recorded attempts are immutable")
         experiment = item_by_id(state, item["run"]["experiment_id"])
-        if experiment["lifecycle_status"]!="active":
-            raise ResearchError("cannot record work under archived experiment without review")
+        if experiment["lifecycle_status"]!="active" or experiment["impact_status"]!="current":
+            raise ResearchError("cannot record work under archived or review-blocked experiment")
+        _require_active_branch_context(state, experiment["id"])
         result = new_item(state, "Result",
                           "Observed result for " + run_id, "experiment",
                           actor=actor, workflow="done", outcome=outcome,
