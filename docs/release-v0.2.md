@@ -79,6 +79,14 @@ A **GitHub native Milestone** groups repository issues. A scientific **Research 
 
 See the [verified Chromium screenshot artifact run #45038688124](https://github.com/dykuang/research-navigator/actions/runs/45038688124) (Artifacts → `research-canvas-synthetic-screenshot`) and the latest [v0.2 CI runs](https://github.com/dykuang/research-navigator/actions/workflows/validate-v02.yml): Python 3.10/3.12 unit+integration, native Windows runner and Linux Chromium UI/security smokes. The browser job captures **an actual Chromium screenshot of a SYNTHETIC project** to the workflow artifact `research-canvas-synthetic-screenshot` (30-day retention), downloadable from the run's Artifacts section. This is **not a screenshot of a user's real research**. Screenshots are provided as reproducible CI artifacts rather than embedding a fictional image.
 
+## Independent user-journey gate (2026-11-23)
+
+The first real-browser independent 7-scenario simulation identified three defects (ResearchBranch v2 revival, connected classic Dashboard navigation, mobile inspector). All three were fixed and closed as [#17](https://github.com/dykuang/research-navigator/issues/17), [#18](https://github.com/dykuang/research-navigator/issues/18) and [#19](https://github.com/dykuang/research-navigator/issues/19).
+
+[Strict CI run #45106298967](https://github.com/dykuang/research-navigator/actions/runs/45106298967) passed **7/7 synthetic user journeys**, 108 Python regression tests on Python 3.10, 3.12 and native Windows 3.12, and the prior Chromium canvas/semantic/SessionRef browser smokes. The suite now uses `python evals/uat_user_journeys.py --strict` to fail CI on an unmet scenario. Read [UAT retest report](uat-retest-v0.2-2026-11-23.md) and the linked initial failing report for before/after evidence.
+
+**Release status is unchanged:** manual real Windows/Codex client evidence, native GitHub issue Milestone and explicit merge/tag approval are still outstanding under [#15](https://github.com/dykuang/research-navigator/issues/15).
+
 ## Release checklist
 
 - [x] All v0.2 feature logic tracked and implemented in #2–#12.
