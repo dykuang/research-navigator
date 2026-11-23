@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feat/v0.3-scientific-reasoning-graph
+      - main
   pull_request:
     branches:
       - main
