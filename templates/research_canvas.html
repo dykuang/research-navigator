@@ -46,8 +46,30 @@ button:disabled{opacity:.5;cursor:default}
 #semanticEditor pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;background:#f1f5fa;padding:9px;border-radius:7px}
 #semanticEditor .attention{color:#8e3b2e;font-weight:650}
 #semanticEditor .ok{color:#176b58;font-weight:650}
+#mobileInspectorToggle,#closeMobileInspector{display:none}
 @media(max-width:1050px){#app{grid-template-columns:205px minmax(0,1fr)}#inspector{position:absolute;right:0;top:54px;width:260px;bottom:0;z-index:8;box-shadow:-8px 0 20px #1e34471a}#workspace{grid-column:2} }
-@media(max-width:680px){#app{grid-template-columns:1fr;grid-template-rows:54px 180px minmax(0,1fr)}aside{grid-column:1;padding:9px;display:flex;gap:9px;overflow:auto}aside>div{min-width:170px}aside h2{display:none}#workspace{grid-column:1}#inspector{display:none}#toolbar{top:6px;left:6px}#hint{display:none}}
+@media(max-width:680px){
+  #app{grid-template-columns:1fr;grid-template-rows:54px 180px minmax(0,1fr)}
+  aside:not(#inspector){grid-column:1;padding:9px;display:flex;gap:9px;overflow:auto}
+  aside:not(#inspector)>div{min-width:170px}
+  aside:not(#inspector) h2{display:none}
+  #workspace{grid-column:1}
+  #toolbar{top:6px;left:6px}
+  #hint{display:none}
+  #mobileInspectorToggle,#closeMobileInspector{display:inline-block}
+  #inspector{
+    display:block;position:fixed;top:54px;bottom:0;left:0;right:0;
+    width:100%;height:auto;z-index:25;background:#fff;overflow-y:auto;
+    border-left:0;box-shadow:0 -8px 30px #20344922;
+    visibility:hidden;transform:translateX(100%);pointer-events:none;
+    transition:transform .18s ease,visibility .18s;
+  }
+  #inspector.open{visibility:visible;transform:translateX(0);pointer-events:auto}
+  #inspector h2{display:block}
+  #closeMobileInspector{position:sticky;top:0;z-index:2;width:100%;
+    background:#edf6f8;text-align:left;font-weight:700}
+  #sessionInspector,#semanticEditor{margin-top:16px;border-top:1px solid #dbe4ed;padding-top:14px}
+}
 </style></head>
 <body>
 <script type="application/json" id="rn-graph">__RN_GRAPH_JSON__</script>
@@ -76,11 +98,11 @@ button:disabled{opacity:.5;cursor:default}
 </div><div><div class="warn info">离线画布只保存视图布局。连接本机 #6 Bridge 后可以提交科研变更提案，但不能从浏览器直接批准、恢复档案或确认科学真值。</div></div></aside>
 <section id="workspace" aria-label="无限研究画布，可按住空白处拖拽、滚轮缩放、使用键盘导航" tabindex="0">
 <div id="world"><svg id="edges" aria-hidden="true"></svg><div id="nodes"></div></div>
-<div id="toolbar"><button id="zoomIn" aria-label="放大">＋</button><button id="zoomOut" aria-label="缩小">－</button><button id="fit" class="primary">适应画布</button><button id="focus">定位节点</button><button id="unselect">取消选择</button><button id="collapse" title="折叠/展开节点邻居">折叠邻居</button></div>
+<div id="toolbar"><button id="zoomIn" aria-label="放大">＋</button><button id="zoomOut" aria-label="缩小">－</button><button id="fit" class="primary">适应画布</button><button id="focus">定位节点</button><button id="unselect">取消选择</button><button id="collapse" title="折叠/展开节点邻居">折叠邻居</button><button id="mobileInspectorToggle" aria-controls="inspector" aria-expanded="false">详情 / 提案</button></div>
 <svg id="minimap" viewBox="0 0 175 125" role="img" aria-label="节点概览迷你地图"></svg>
 <div id="hint">拖动空白处平移 · 滚轮缩放 · 拖动卡片仅改变布局 · 聚焦卡片后按方向键移动 · Enter 查看详情</div>
 </section>
-<aside id="inspector" aria-live="polite"><div><h2>节点详情</h2><div id="details" class="info">请选择画布中的研究节点。关联证据、实验状态与分支信息在此展示。</div></div>
+<aside id="inspector" aria-live="polite"><button id="closeMobileInspector" aria-controls="inspector">← 返回画布</button><div><h2>节点详情</h2><div id="details" class="info">请选择画布中的研究节点。关联证据、实验状态与分支信息在此展示。</div></div>
 <div id="sessionInspector"><h2>Agent 会话溯源</h2>
 <label for="sessionProviderFilter">Provider</label><select id="sessionProviderFilter"><option value="">全部</option><option value="codex">Codex</option><option value="chatgpt">ChatGPT</option><option value="other">Other</option></select>
 <label for="sessionWorkspaceFilter">工作空间筛选</label><input id="sessionWorkspaceFilter" placeholder="Workspace ID"><div id="sessionRecords" class="info">选择节点查看关联会话</div>
@@ -255,8 +277,19 @@ function render(){
     allEdges.filter(e=>active.has(e.from)&&active.has(e.to)).length+" 条连线";
   renderMini();
 }
+function openMobileInspector(){
+  if(window.matchMedia("(max-width:680px)").matches){
+    $("inspector").classList.add("open");
+    $("mobileInspectorToggle").setAttribute("aria-expanded","true");
+  }
+}
+function closeMobileInspector(){
+  $("inspector").classList.remove("open");
+  $("mobileInspectorToggle").setAttribute("aria-expanded","false");
+}
 function selectNode(id){
   state.selected=id;
+  openMobileInspector();
   render();
   const node=byId.get(id);if(!node)return;
   const related=allEdges.filter(e=>e.from===id||e.to===id);
@@ -656,6 +689,11 @@ $("search").addEventListener("input",render);
 $("zoomIn").onclick=()=>zoomAt(1.2,viewport.clientWidth/2,viewport.clientHeight/2);
 $("zoomOut").onclick=()=>zoomAt(1/1.2,viewport.clientWidth/2,viewport.clientHeight/2);
 $("fit").onclick=fitAll;$("focus").onclick=focusSelected;
+$("mobileInspectorToggle").onclick=()=>{
+  if($("inspector").classList.contains("open"))closeMobileInspector();
+  else openMobileInspector();
+};
+$("closeMobileInspector").onclick=closeMobileInspector;
 $("unselect").onclick=()=>{state.selected=null;$("details").textContent="请选择一个节点";render();renderSessions(null)};
 $("collapse").onclick=()=>{
   if(!state.selected){notice("先选择节点，再折叠或展开直接邻居");return}
