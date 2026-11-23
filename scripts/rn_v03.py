@@ -81,7 +81,7 @@ def validate_v03(state):
                         value=metric.get("value")
                         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
                             errors.append(f"{ident}: metric must contain measured numeric value")
-             if run.get("status") == "invalidated" and not run.get("invalidation_reason"):
+            if run.get("status") == "invalidated" and not run.get("invalidation_reason"):
                 errors.append(f"{ident}: invalidated run needs a reason")
         if item.get("type") == "DecisionTrace":
             trace = item.get("decision_trace")
