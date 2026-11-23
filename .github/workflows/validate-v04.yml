@@ -40,6 +40,8 @@ jobs:
         run: python evals/uat_v03_multiround.py
       - name: v0.4 synthetic researcher journey
         run: python evals/uat_v04_multiround.py
+      - name: Six owner-like research journeys with automatic fixture cleanup
+        run: python evals/uat_v04_researcher_rounds.py
       - name: CLI smoke & explicit data isolation
         shell: bash
         run: |
