@@ -82,7 +82,8 @@ class CanvasTests(unittest.TestCase):
         scripts=[x for x in matches if "(function(){" in x]
         self.assertEqual(len(scripts),1)
         cp=subprocess.run(["node","--check"],input=scripts[0],text=True,
-                          capture_output=True,timeout=10)
+                          # Windows GitHub runners occasionally take >10 s to launch Node.
+                           capture_output=True,timeout=60)
         self.assertEqual(cp.returncode,0,cp.stderr)
     def test_layout_only_does_not_change_research_state(self):
         add_item(self.root,kind="Idea",title="Idea",module="topic")
