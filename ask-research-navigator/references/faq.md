@@ -41,3 +41,12 @@
 
 **Windows 已自动安装了吗？**
 没有。GitHub CI 可以在原生 Windows runner 上验证 Python/HTML 兼容性，但用户自己的 Codex/Windows 安装与会话定位仍必须手动检查。建议 PowerShell 中设置 `$env:PYTHONUTF8='1'`。
+
+## v0.3 (development branch) — Experimental Run / DecisionTrace
+
+If v0.3 is installed, `scripts/v03_project.py` can register experiment
+attempts with verified project-local log hashes, report scoped Claim evidence
+conflicts and replay **existing** event IDs linked to research decisions.
+It does **not** execute experiments, auto-verify scientific truth or ingest
+the full Codex conversation. The main Canvas's Reasoning view is read-only
+and cannot approve research claims. See `references/reasoning-v03.md`.
