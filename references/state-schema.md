@@ -53,3 +53,15 @@ The Canvas stores a proposal queue in `research/canvas/proposals/` (not canonica
 SessionRef records hold provider/workspace/session IDs, optional *unverified* clean HTTPS metadata URL, explicit entity IDs/roles, recording actor/time. Browser `register-session`, `link-session` and `unlink-session` are pending proposals until terminal approval. No provider session URL is marked verified by the v0.2 adapter, so SessionRef inspector provides manual ID copy rather than guessed auto-navigation.
 
 Layout `research/canvas/views.json` contains project ID, node positions, viewport, collapsed node IDs, pinned groups and view metadata only; no scientific status fields. For Windows UTF-8 output use `PYTHONUTF8=1`. The GitHub native Milestone for issue planning is not the research `Milestone` entity inside `items.json`.
+
+## v0.3 Additive Reasoning Records
+
+The project schema field remains `0.2.0` for backward-compatible additive
+records; this is not a destructive v0.3 migration. `ExperimentRun` and
+`DecisionTrace` are new canonical `items` types with stable `RUN-` and
+`TRACE-` IDs. Their nested typed `run` and `decision_trace` metadata is
+validated by `rn_v03.validate_v03` after the existing core/v0.2 validators.
+New data shares revision checking, file journaling and event history. The full
+data contract, commands and ethical boundaries are in
+[`reasoning-v03.md`](reasoning-v03.md). Neither type is a positive planning
+candidate. No new unapproved browser writeback endpoint exists.
