@@ -96,3 +96,15 @@ python -m unittest discover -s evals -p 'test_*.py' -v
 ## 许可证
 
 MIT License，见 [LICENSE](LICENSE)。
+
+## v0.4 开发分支：Research Decision Intelligence
+
+本功能目前在 `feat/v0.4-research-decision-intelligence` 开发，**不代表 v0.4 稳定发布**。在 v0.3 的可验证 Run、Scoped Evidence、DecisionTrace 基础上，新增只读决策分析：
+
+- `python scripts/v04_project.py PROJECT_ROOT gaps` — 依赖、证据、里程碑验收缺口；
+- `python scripts/v04_project.py PROJECT_ROOT opportunities` — 与可证伪观察相关的最低成本检查草案（**成本未知，不保证有效或获准执行**）；
+- `python scripts/v04_project.py PROJECT_ROOT archive` — 已搁置/隔离/退休研究路线的复审条件看板（**不自动重启**）；
+- `python scripts/v04_project.py PROJECT_ROOT brief --format markdown --output advisor.md` — 导师决策摘要；
+- `python scripts/build_dashboard.py PROJECT_ROOT` — 保留原工作台与画布，额外生成 `research/canvas/decisions.html` 离线只读决策页（非实时审批 UI）。
+
+架构约束：当前项目状态 schema 仍为 `0.2.0`，v0.4 为派生分析层，不另建权威科学数据库。新建议不改变 `workflow / epistemic / review / outcome / lifecycle`，不自动将负结果视作科学证伪，也不基于未经验证的来源宣称有文献共识。详见 `references/decision-v04.md`、`docs/roadmap/v0.4.md`。
