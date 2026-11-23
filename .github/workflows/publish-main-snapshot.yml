@@ -1,0 +1,56 @@
+name: Publish frozen main v0.1.0 snapshot (one-time)
+on:
+  push:
+    branches: [v0.2]
+    paths:
+      - ".github/workflows/publish-main-snapshot.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  release-main-before-v02-merge:
+    name: Freeze old main as v0.1.0
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify old main SHA and absent tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OLD_MAIN_SHA: "922b4bf8a7e588b4454eff13347d1e0688bf5926"
+        run: |
+          set -euo pipefail
+          current="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          echo "current main: ${current}"
+          test "${current}" = "${OLD_MAIN_SHA}" || {
+            echo "::error::main moved; refusing to tag the wrong commit"
+            exit 1
+          }
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v0.1.0" >/dev/null 2>&1; then
+            echo "::error::release already exists"; exit 1
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v0.1.0" >/dev/null 2>&1; then
+            echo "::error::tag already exists"; exit 1
+          fi
+      - name: Create GitHub Release pinned to pre-merge main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OLD_MAIN_SHA: "922b4bf8a7e588b4454eff13347d1e0688bf5926"
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
+            -f tag_name="v0.1.0" \
+            -f target_commitish="${OLD_MAIN_SHA}" \
+            -f name="Research Navigator v0.1.0" \
+            -f body="Snapshot of the original main branch (commit ${OLD_MAIN_SHA}) before merging the v0.2 Research Canvas branch. Includes the initial stateful research workflow skill, source/evidence tracking, archival lifecycle, CLI utilities and offline HTML/SVG dashboard. This release intentionally does not contain the v0.2 infinite canvas or SessionRef editing workflow. The v0.2 development work is tracked separately by PR #16." \
+            -F draft=false -F prerelease=false \
+            --jq '{url: .html_url, tag: .tag_name, target: .target_commitish, id: .id}'
+      - name: Verify tag resolves to exact pre-merge commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OLD_MAIN_SHA: "922b4bf8a7e588b4454eff13347d1e0688bf5926"
+        run: |
+          set -euo pipefail
+          tagsha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v0.1.0" --jq '.object.sha')"
+          echo "v0.1.0 tag resolves to ${tagsha}"
+          test "${tagsha}" = "${OLD_MAIN_SHA}"
