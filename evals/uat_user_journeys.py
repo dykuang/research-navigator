@@ -18,7 +18,7 @@ import tempfile
 import threading
 from urllib.parse import urljoin
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
 from rn_core import (ResearchError, add_item, add_relation, init_project, load, query)
@@ -280,26 +280,18 @@ def mobile_viewport(browser):
                 page.screenshot(path=str(ARTIFACTS/"uat-mobile-390.png"),full_page=True)
                 assert page.locator("#mobileInspectorToggle").is_visible()
                 page.locator(".node").first.click()
-                debug=page.evaluate("""() => {
-                  const ins=document.getElementById('inspector');
-                  const det=document.getElementById('details');
-                  const c=getComputedStyle(ins);
-                  const d=getComputedStyle(det);
-                  return {vw:innerWidth,inner:ins.className,visible:!!det.getClientRects().length,
-                          position:c.position,display:c.display,visibility:c.visibility,
-                          pointerEvents:c.pointerEvents,transform:c.transform,
-                          detailsText:det.textContent.slice(0,100),detailsVisibility:d.visibility};
-                }""")
-                print("MOBILE_INSPECTOR_DEBUG="+json.dumps(debug,ensure_ascii=False),flush=True)
-                assert page.locator("#details").is_visible(), debug
-                assert page.locator("#sessionProviderFilter").is_visible()
-                assert page.locator("#semanticOperation").is_visible()
+                # Wait for the 180ms visibility/transform drawer transition.
+                # Immediate is_visible() in the first rendering frame is a
+                # false-negative even though the real pointer selection works.
+                expect(page.locator("#details")).to_be_visible(timeout=4000)
+                expect(page.locator("#sessionProviderFilter")).to_be_visible(timeout=4000)
+                expect(page.locator("#semanticOperation")).to_be_visible(timeout=4000)
                 assert page.locator("#previewSemantic").is_enabled()
                 assert page.locator("#mobileInspectorToggle").get_attribute("aria-expanded")=="true"
                 page.locator("#closeMobileInspector").click()
                 assert page.locator("#mobileInspectorToggle").get_attribute("aria-expanded")=="false"
                 page.locator("#mobileInspectorToggle").click()
-                assert page.locator("#semanticParams").is_visible()
+                expect(page.locator("#semanticParams")).to_be_visible(timeout=4000)
                 record(name,"pass","小屏可选节点查看详情、SessionRef 和受控提案",
                        "390px 移动 Chromium 上抽屉可打开/关闭，查看证据和编辑器")
             finally:
