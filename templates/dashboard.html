@@ -20,9 +20,23 @@
 <section class="section view hidden" id="view-history"><div class="section-title"><h2>研究变更和决策历史</h2><span class="subtle">来自追加式 JSONL 事件日志（此页为最近事件快照）</span></div><div class="grid2"><div class="card"><h3>最近状态变更</h3><div id="events"></div></div><div class="card"><h3>来源可信度与复核限制</h3><div id="sources"></div><div class="graph-note" style="margin-top:13px">source-backed ≠ 学术真理；user-confirmed ≠ 实验正确；done ≠ validated；未核实文献不得作为确认创新性的依据。</div></div></div></section>
 <div class="footer" id="footer"></div></main></div>
 <div id="overlay" class="overlay"></div><aside class="drawer" id="drawer" aria-label="实体详情"><button id="drawerClose" class="close">关闭 ×</button><div id="drawerContent"></div></aside><div id="toast" class="toast"></div>
-<script>
+<script nonce="__DASHBOARD_NONCE__">
 'use strict';
-const DATA=JSON.parse(document.getElementById('rn-data').textContent);
+(async function(){
+let DATA=JSON.parse(document.getElementById('rn-data').textContent);
+if(DATA===null){
+  // The connected dashboard is a data-free shell. Never embed private
+  // research metadata into an unauthenticated HTTP navigation response.
+  const token=sessionStorage.getItem('rn_canvas_local_capability');
+  if(!token)throw Error('缺少本机授权，请从终端启动的私有地址重新打开画布。');
+  const res=await fetch('/api/dashboard',{cache:'no-store',headers:{'X-RN-Token':token}});
+  if(!res.ok)throw Error('Dashboard access denied: HTTP '+res.status);
+  DATA=await res.json();
+  // Offline dashboard link remains file-relative; live dashboard returns to
+  // the authenticated shell without inserting capability tokens in URLs.
+  const canvasLink=document.querySelector('a[href="../canvas/index.html"]');
+  if(canvasLink)canvasLink.href='/canvas';
+}
 const ITEMS=DATA.items||[],REL=DATA.relations||[],SRC=DATA.sources||[],EV=DATA.events||[];
 const MOD={topic:'选题',literature:'文献与基线',experiment:'实验方案',pivot:'路线调整',synthesis:'总结交付'};
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -56,4 +70,10 @@ function navigate(v){document.querySelectorAll('.view').forEach(x=>x.classList.t
 document.addEventListener('click',async(e)=>{const nv=e.target.closest('[data-view]');if(nv){navigate(nv.dataset.view);return;}const op=e.target.closest('[data-open]');if(op){e.preventDefault();openItem(op.dataset.open);return;}const cop=e.target.closest('[data-copy]');if(cop){const txt=cop.dataset.copy;try{await navigator.clipboard.writeText(txt);toast('只读回顾指令已复制')}catch{const a=document.createElement('textarea');a.value=txt;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove();toast('已复制指令')}}});
 el('role').addEventListener('change',overview);['search','filterModule','filterLifecycle','filterWorkflow','filterReview'].forEach(x=>el(x).addEventListener('input',renderItems));['archiveSearch','archiveStatus'].forEach(x=>el(x).addEventListener('input',renderArchive));el('graphModule').addEventListener('change',renderGraph);el('graphReset').addEventListener('click',()=>{el('graphModule').value='';renderGraph()});el('drawerClose').addEventListener('click',closeDrawer);el('overlay').addEventListener('click',closeDrawer);document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer()});
 filterOptions();overview();renderItems();renderArchive();renderEvents();
+})().catch(err=>{
+  const heading=document.getElementById('heroTitle');
+  if(heading)heading.textContent='无法读取受保护的科研工作台';
+  const place=document.getElementById('heroQuestion')||document.body;
+  place.textContent=String(err.message||err);
+});
 </script></body></html>
