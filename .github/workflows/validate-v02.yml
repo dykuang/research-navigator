@@ -52,6 +52,19 @@ jobs:
         run: python evals/browser_check_canvas_semantic.py
       - name: Real browser SessionRef smoke
         run: python evals/browser_check_canvas_sessions.py
+      - name: Seven simulated user journeys (diagnostic)
+        run: python evals/uat_user_journeys.py
+      - name: Upload user journey evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v02-uat-user-journeys
+          path: |
+            artifacts/uat-user-journeys.json
+            artifacts/uat-novice-desktop.png
+            artifacts/uat-mobile-390.png
+          if-no-files-found: warn
+          retention-days: 30
       - name: Upload synthetic Chromium screenshot
         if: always()
         uses: actions/upload-artifact@v4
