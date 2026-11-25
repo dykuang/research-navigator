@@ -194,7 +194,6 @@ class InterviewLifecycleTests(unittest.TestCase):
                                  check=True,encoding="utf-8")
         restored=json.loads(completed.stdout)
         self.assertEqual(restored["confirmed"][0]["answer"],"Synthetic target metric")
-        self.assertIn("does not", "does not automatically activate")
         self.assertIn("新会话不保证",restored["startup_hint"])
         self.assertEqual(read(self.root)["status"],"active")
     def test_agents_md_opt_in_does_not_overwrite(self):
