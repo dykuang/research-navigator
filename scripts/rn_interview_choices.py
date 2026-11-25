@@ -92,6 +92,38 @@ def codex_request(question):
         "options":options,
     }]}
 
+
+def codex_async_request(question):
+    """Preview request_user_input_async (Default-mode-capable clients).
+
+    The tool returns {"accepted":true}, which is merely delivery acknowledgement.
+    The actual answer arrives later as user chat input, not in this tool result.
+    """
+    choices=display_choices(question)
+    ordered=sorted(choices,key=lambda c:0 if c["id"]==question.get("recommended_choice_id") else 1)
+    labels=[c["label"] for c in ordered]
+    if not choices:
+        return {"questions":[{"title":question["text"]}]}
+    if len(labels)>MAX_CHOICES:
+        raise ResearchError("invalid async choices")
+    return {"questions":[{"title":question["text"],"options":labels}]}
+
+def resolve_async_reply(question,text):
+    """Read-only interpretation of a subsequent explicit user reply.
+
+    An unfamiliar nonempty response is a candidate custom answer, not a fact
+    or silently saved confirmation. The caller must confirm with the user.
+    """
+    if not isinstance(text,str) or not text.strip() or len(text)>12000:
+        raise ResearchError("empty or oversized async reply")
+    value=text.strip()
+    choices=display_choices(question)
+    matches=[c for c in choices if c["label"]==value]
+    if len(matches)>1:raise ResearchError("ambiguous async choice")
+    if matches:
+        return {"choice_id":matches[0]["id"],"custom_answer":None}
+    return {"choice_id":OTHER,"custom_answer":value}
+
 def text_prompt(question):
     choices=display_choices(question)
     preface=question["id"]+" "+question["text"]
