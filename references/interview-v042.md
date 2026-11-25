@@ -62,3 +62,16 @@ The `research/canvas/interview.html` view now has radio cards, a custom Other te
 - Tests use isolated synthetic projects and remove all temporary artifacts.
 
 Native request guidance checked against public `openai/codex` source file `codex-rs/core/src/tools/handlers/request_user_input_spec.rs` (subject to client/mode changes).
+
+## Codex Default-mode asynchronous questions
+
+Some current Codex clients additionally expose `request_user_input_async`, with an **alternative schema** to the blocking `request_user_input`: `{"questions":[{"title":"...", "options":["A","B"]}]}`. It returns an immediate `{"accepted":true}` acknowledgement of delivery, **not a user selection or consent**. A user's answer arrives later as a separate message and must be confirmed before saving.
+
+```bash
+python scripts/interview.py PROJECT_ROOT async-request --question Q-0001
+# After a real subsequent user response:
+python scripts/interview.py PROJECT_ROOT resolve-async --question Q-0001 --text "新想法"
+```
+
+The agent must inspect the actual currently available tool names. Prefer a blocking picker where supported for a decision that must be answered before progressing. If only the async picker is offered, send the question, **do not continue dependent work until a real user message arrives**, and never treat `accepted=true` as an answer. If cards do not appear or remain pending unexpectedly, send the full text question via `prompt` rather than claim the UI succeeded. Native async display and reply lifecycle vary by client and OS; this adapter is a tested formatter, not an end-to-end client integration.
+
