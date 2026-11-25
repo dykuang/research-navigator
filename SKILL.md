@@ -150,3 +150,11 @@ python scripts/build_dashboard.py /PROJECT/ROOT
 
 **默认模式的异步交互补充（v0.4.2）：**部分 Codex 客户端仅提供 `request_user_input_async`，参数为 `questions:[{title,options:[文字选项]}]`，可以从 `interview.py PROJECT_ROOT async-request --question Q-0001` 生成**只读**建议。该工具返回的 `{"accepted":true}` **只表示发送请求成功，不表示用户选择或授权**。Agent 必须等待实际的新用户消息，并在确认后记录；必要时用 `resolve-async --question Q-0001 --text '用户原话'` 将回答解释为固定选项或 Other。异步卡片未显示、被关闭或无法取得回答时，立即提供明确文本选项降级。不得在仅收到 accepted 时推进依赖问题。
 
+
+### v0.4.2 必须执行的弹窗失败降级协议（#56）
+
+每次提问前可用 `python scripts/interview.py PROJECT_ROOT present --question Q-0001` 得到**直接可用的普通聊天问题**（全部备选项 + **其他／自定义** + **补充说明（可选）**）。只有确认当前运行时实际暴露工具，才将 `--capability sync` 或 `--capability async` 传给 `present` 并尝试真正的 Codex 原生工具调用。CLI 不会自己弹窗、也不会声称弹窗已显示。
+
+**强制兜底：**如果工具不存在、禁用、调用报错、取消、超时、或者用户没有看到选择界面／没有交回可解析答案，**立刻在当前对话内用** `present --question Q-0001 --capability sync --failure error`（将实际原因换为 `unavailable/error/timeout/cancelled/no-answer`）的 `fallback_text` 向用户普通提问。不能只发 JSON、不能等待虚构的弹窗成功、不能自动选择默认项、不能因异步工具 `accepted=true` 而跳过提问或提前确认。
+
+选预设项时用户仍可以补充自己的条件／理由／新观点，用 `answer --question Q-0001 --choice ID --supplement '补充原话'` 保存；选“其他”用 `--choice other --custom-answer '自定义答案' --supplement '可选说明'`。**选项补充内容和自定义答案都要经用户实际确认**，不能转化成科学证据。新会话恢复 `handoff` 应同时带回 selected ID、自定义和 supplement。离线 HTML 仅生成草案，不会写回。
