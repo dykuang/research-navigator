@@ -82,6 +82,11 @@ def _validate(doc, project):
             raise ResearchError("legacy options summary must be nonempty when supplied")
         if "choices" in q:
             validate_choices(q["choices"], q.get("recommended_choice_id"))
+        if "supplement" in q and q["supplement"] is not None:
+            extra=q["supplement"]
+            if (q.get("status")!="answered" or not isinstance(extra,str)
+                or not extra.strip() or len(extra)>12000):
+                raise ResearchError("unconfirmed/invalid supplementary explanation")
         if "selected_option_id" in q:
             selected=q["selected_option_id"]
             origin=q.get("answer_source")
@@ -91,7 +96,8 @@ def _validate(doc, project):
                 if origin not in ("choice","other"):
                     raise ResearchError("invalid answer source")
                 normalized=answer_fields(q,"",choice_id=selected,
-                    custom_answer=q.get("custom_answer"))
+                    custom_answer=q.get("custom_answer"),
+                    supplement=q.get("supplement"))
                 if normalized["answer"]!=q.get("answer"):
                     raise ResearchError("selected answer does not match option or custom answer")
             elif origin not in (None,"free-text","unanswered"):
@@ -225,14 +231,16 @@ def add_questions(root,questions,*,actor="agent",expected_revision=None):
                "lowest_cost_check":data["lowest_cost_check"].strip(),
                "depends_on":list(dependencies),"status":"pending","answer":"",
                "confirmed_by":None,"round":doc["round"],"answered_at":None,
-               "selected_option_id":None,"custom_answer":None,"answer_source":"unanswered"}
+               "selected_option_id":None,"custom_answer":None,
+               "answer_source":"unanswered","supplement":None}
             ids.add(qid)
             doc["questions"].append(q);newly.append(qid)
         _event(doc,"questions-added",actor,{"ids":newly,"round":doc["round"]})
     return _mutate(root,op,expected_revision=expected_revision)
 
 def answer(root,question_id,answer_text="",*,status="answered",actor="user",
-           revise=False,expected_revision=None,choice_id=None,custom_answer=None):
+           revise=False,expected_revision=None,choice_id=None,custom_answer=None,
+           supplement=None):
     _human(actor)
     if status not in ("answered","deferred","unresolved"):
         raise ResearchError("answer status must be answered, deferred or unresolved")
@@ -252,17 +260,19 @@ def answer(root,question_id,answer_text="",*,status="answered",actor="user",
             raise ResearchError("前置问题尚未得到确认，不能回答依赖问题")
         old=q["status"]
         if status=="answered":
-            fields=answer_fields(q,answer_text,choice_id,custom_answer)
+            fields=answer_fields(q,answer_text,choice_id,custom_answer,supplement)
         else:
-            if choice_id is not None or custom_answer is not None:
-                raise ResearchError("deferred/unresolved cannot select a confirmed choice")
+            if choice_id is not None or custom_answer is not None or supplement is not None:
+                raise ResearchError("deferred/unresolved cannot select or supplement a confirmed choice")
             fields={"answer":answer_text.strip(),"selected_option_id":None,
-                    "custom_answer":None,"answer_source":"unanswered"}
+                    "custom_answer":None,"answer_source":"unanswered",
+                    "supplement":None}
         q["status"]=status
         q["answer"]=fields["answer"]
         q["selected_option_id"]=fields["selected_option_id"]
         q["custom_answer"]=fields["custom_answer"]
         q["answer_source"]=fields["answer_source"]
+        q["supplement"]=fields["supplement"]
         q["confirmed_by"]=actor if status=="answered" else None
         q["answered_at"]=now()
         affected=[]
@@ -278,13 +288,15 @@ def answer(root,question_id,answer_text="",*,status="answered",actor="user",
                         other["selected_option_id"]=None
                         other["custom_answer"]=None
                         other["answer_source"]="unanswered"
+                        other["supplement"]=None
                         affected.append(other["id"])
                     children.add(other["id"])
         _event(doc,"answer-"+status,actor,
                {"question_id":question_id,"revise":revise,
                 "invalidated_dependents":affected,
                 "selected_option_id":q["selected_option_id"],
-                "answer_source":q["answer_source"]})
+                "answer_source":q["answer_source"],
+                "has_supplement":bool(q["supplement"])})
     return _mutate(root,op,expected_revision=expected_revision)
 
 def frontier(doc,limit=MAX_QUESTIONS_PER_ROUND):
@@ -404,7 +416,8 @@ def handoff(root):
     resolved=[{"id":q["id"],"question":q["text"],"answer":q["answer"],
                "selected_option_id":q.get("selected_option_id"),
                "custom_answer":q.get("custom_answer"),
-               "answer_source":q.get("answer_source","free-text")}
+               "answer_source":q.get("answer_source","free-text"),
+               "supplement":q.get("supplement")}
               for q in doc["questions"] if q["status"]=="answered"]
     return {"project_root":str(paths(root)["root"]),
             "interview_id":doc["interview_id"],
