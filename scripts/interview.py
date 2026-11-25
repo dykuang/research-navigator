@@ -6,7 +6,8 @@ import sys
 
 from rn_core import ResearchError, paths
 from rn_interview_choices import (codex_request,codex_async_request,text_prompt,
-                                  resolve_codex_answer,resolve_async_reply)
+                                  resolve_codex_answer,resolve_async_reply,
+                                  delivery_plan)
 from rn_interview import (start,read,add_questions,answer,pause,resume,request_exit,
                           reject_exit,confirm_exit,abandon,reopen,frontier,handoff)
 
@@ -14,7 +15,7 @@ def main():
     p=argparse.ArgumentParser(description="Persistent, explicit v0.4.1 research grilling interview")
     p.add_argument("root",help="Existing initialized research project ROOT")
     sub=p.add_subparsers(dest="command",required=True)
-    for cmd in ("start","status","add-questions","answer","next","prompt","native-request","resolve-native","async-request","resolve-async","pause","resume",
+    for cmd in ("start","status","add-questions","answer","next","present","prompt","native-request","resolve-native","async-request","resolve-async","pause","resume",
                 "request-exit","reject-exit","confirm-exit","abandon","reopen","handoff"):
         sp=sub.add_parser(cmd)
         if cmd=="start":
@@ -29,9 +30,15 @@ def main():
             sp.add_argument("--revise",action="store_true")
             sp.add_argument("--choice",help="Stable choice ID or other for free-form response")
             sp.add_argument("--custom-answer",help="Original user text; requires --choice other")
+            sp.add_argument("--supplement",help="Optional additional explanation with ANY answer/choice")
         if cmd=="next":sp.add_argument("--limit",type=int,default=5)
-        if cmd in ("prompt","native-request","resolve-native","async-request","resolve-async"):
+        if cmd in ("present","prompt","native-request","resolve-native","async-request","resolve-async"):
             sp.add_argument("--question",required=True)
+        if cmd=="present":
+            sp.add_argument("--capability",choices=("none","sync","async"),default="none",
+                            help="Only set sync/async if the REAL client exposes it")
+            sp.add_argument("--failure",choices=("unavailable","error","timeout","cancelled","no-answer"),
+                            help="If delivery failed, return normal-chat fallback regardless of capability")
         if cmd=="resolve-async":sp.add_argument("--text",required=True)
         if cmd=="resolve-native":
             sp.add_argument("--response-json",required=True,
@@ -40,7 +47,8 @@ def main():
             sp.add_argument("--reason",required=True)
         if cmd=="confirm-exit":
             sp.add_argument("--accept-open",action="append",default=[],help="Explicitly acknowledge each unresolved question ID")
-        if cmd not in ("status","next","handoff"):
+        if cmd not in ("status","next","handoff","present","prompt","native-request",
+                       "resolve-native","async-request","resolve-async"):
             sp.add_argument("--actor",choices=("agent","user","mentor"),
                             default=("agent" if cmd in ("add-questions","request-exit") else "user"))
             sp.add_argument("--expected-revision",type=int)
@@ -48,7 +56,8 @@ def main():
     try:
         c=args.command
         common={}
-        if c not in ("status","next","handoff","start"):
+        if c not in ("status","next","handoff","start","present","prompt",
+                      "native-request","resolve-native","async-request","resolve-async"):
             common={"actor":args.actor,"expected_revision":args.expected_revision}
         if c=="start":data=start(args.root,topic=args.topic,actor=args.actor,restart=args.restart)
         elif c=="status":
@@ -62,9 +71,10 @@ def main():
         elif c=="answer":
             data=answer(args.root,args.question,args.text,status=args.status,
                         revise=args.revise,choice_id=args.choice,
-                        custom_answer=args.custom_answer,**common)
+                        custom_answer=args.custom_answer,
+                        supplement=args.supplement,**common)
         elif c=="next":data=frontier(read(args.root),args.limit)
-        elif c in ("prompt","native-request","resolve-native","async-request","resolve-async"):
+        elif c in ("present","prompt","native-request","resolve-native","async-request","resolve-async"):
             document=read(args.root)
             questions={q["id"]:q for q in document["questions"]}
             selected=questions.get(args.question)
@@ -72,7 +82,9 @@ def main():
             allowed={q["id"] for q in frontier(document)["ready"]}
             if document["status"]!="active" or args.question not in allowed:
                 raise ResearchError("question is not available for an active interview")
-            if c=="prompt":data={"question_id":selected["id"],"text":text_prompt(selected),
+            if c=="present":
+                data=delivery_plan(selected,args.capability,args.failure)
+            elif c=="prompt":data={"question_id":selected["id"],"text":text_prompt(selected),
                                   "interactive_ui":False,"writeback":False}
             elif c=="native-request":
                 data={"tool_name":"request_user_input",
