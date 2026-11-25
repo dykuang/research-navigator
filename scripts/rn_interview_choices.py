@@ -29,7 +29,7 @@ def validate_choices(choices, recommended=None):
         if item["label"].casefold() in labels:
             raise ResearchError("duplicate choice label")
         labels.add(item["label"].casefold())
-    if recommended is not None and recommended.lower() not in ids:
+    if recommended is not None and (not isinstance(recommended,str) or recommended.lower() not in ids):
         raise ResearchError("recommended_choice_id missing from choices")
     return True
 
@@ -54,7 +54,7 @@ def answer_fields(question,answer_text,choice_id=None,custom_answer=None):
         raise ResearchError("typed selection requires structured question choices")
     if not isinstance(choice_id,str):raise ResearchError("invalid choice ID")
     if choice_id.lower()==OTHER:
-        if not isinstance(custom_answer,str) or not custom_answer.strip():
+        if not isinstance(custom_answer,str) or not custom_answer.strip() or len(custom_answer)>12000:
             raise ResearchError("Other requires nonempty custom answer")
         if answer_text:
             raise ResearchError("do not combine --text and --custom-answer")
