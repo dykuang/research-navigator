@@ -60,3 +60,9 @@ description: Use when a student, advisor, or first-time user explicitly asks how
 ## v0.2 使用指引（仅解释/路由，默认不写数据）
 
 当用户询问无限画布，说明 `python scripts/build_dashboard.py PROJECT_ROOT` 同时生成离线经典 SVG 与可平移缩放的 `research/canvas/index.html`；**离线画布不写科研数据**。需要提出新 Branch/Idea/Milestone 或证据关系时须明确授权后使用本机 `local_editor.py serve`，依次预览、入队、交互终端人工审批和刷新。归档失败路径需记录条件，两阶段回收创建新候选而非覆盖历史。SessionRef 只关联会话 ID，不读取完整聊天；Codex 深链接未验证只能复制 ID。Windows/Codex 安装未在用户 PC 自动执行。详细依据见主 Skill 的 `references/canvas-guide.md`、`references/idea-lifecycle.md`、`references/windows-codex-qa.md`。
+
+## v0.4.1 persistent grilling 使用引导
+
+若用户问「为什么在新会话回答后不继续追问」或「能不能像 Matt 的 Grilling 一样持续诘问」：明确区分同一 Session 和独立 Session。新聊天默认不继承旧聊天对 Skill 的调用；持久 `research/interviews/current.json` 只能保存已明确执行的访谈状态，不会自行启动 Agent。
+
+推荐用户在同一会话显式说「用 research-navigator 对这个研究项目开启持续 Grilling 访谈；直到我确认结束才退出」，之后每轮回答即可继续。在新会话说「重新调用 research-navigator，读取此项目访谈状态并继续 `next` 的待回答问题」，不要让用户重复已保存的答案。项目可在用户主动选择后用 `install_interview_guidance.py PROJECT_ROOT --apply` 创建项目本地 AGENTS.md 提示，**不是全局 Skill 自动激活**。详见主 Skill `references/interview-v041.md`。
