@@ -1,0 +1,29 @@
+name: Bootstrap v0.4.2 GitHub Milestone (temporary)
+on:
+  push:
+    branches: [feat/v0.4.2-interactive-grilling]
+    paths: [.github/workflows/v042-milestone-bootstrap.yml]
+permissions:
+  contents: read
+  issues: write
+jobs:
+  native-milestone:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create or reuse native v0.4.2 milestone
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: "v0.4.2 — Interactive Grilling Questions"
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing=$(gh api "repos/$GH_REPO/milestones?state=all&per_page=100" --jq '.[] | select(.title == env.TITLE) | .number' | head -n 1)
+          if [ -n "$existing" ]; then
+            echo "Existing milestone number: $existing"
+          else
+            gh api --method POST "repos/$GH_REPO/milestones" \
+              -f title="$TITLE" \
+              -f description="v0.4.2: typed interview choices, always-available Other/free text, Codex request_user_input adapter with honest unsupported-mode fallback, offline draft UI, persistence and regression. Base on merged v0.4.1." \
+              --jq '"Created milestone number: " + (.number|tostring)'
+          fi
