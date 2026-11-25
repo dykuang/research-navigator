@@ -147,3 +147,6 @@ python scripts/build_dashboard.py /PROJECT/ROOT
 当用户询问“下一步做什么、证据不足在哪里、哪条实验最有信息价值、导师需要审核什么”时，优先运行 `python scripts/v04_project.py PROJECT_ROOT brief` 或 `gaps / opportunities / archive`。按需参考 `references/decision-v04.md`，不必开始新项目或回到初始访谈。报告读取 v0.3 权威状态，不写入项目状态、批准实验或解除归档隔离。**任何建议只是用于讨论的假设；信息价值和成本默认为未知，无法用虚构概率/评分替代证据。**
 
 无限画布离线导出后，打开 `research/canvas/decisions.html` 查看证据缺口、低成本区分性检查、导师审查和历史路线复审。画布的科学语义编辑仍需 v0.2 本机提案 → 人工终端批准；不得让代理把离线建议伪装成通过审批的待执行任务。
+
+**默认模式的异步交互补充（v0.4.2）：**部分 Codex 客户端仅提供 `request_user_input_async`，参数为 `questions:[{title,options:[文字选项]}]`，可以从 `interview.py PROJECT_ROOT async-request --question Q-0001` 生成**只读**建议。该工具返回的 `{"accepted":true}` **只表示发送请求成功，不表示用户选择或授权**。Agent 必须等待实际的新用户消息，并在确认后记录；必要时用 `resolve-async --question Q-0001 --text '用户原话'` 将回答解释为固定选项或 Other。异步卡片未显示、被关闭或无法取得回答时，立即提供明确文本选项降级。不得在仅收到 accepted 时推进依赖问题。
+
