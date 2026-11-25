@@ -11,7 +11,7 @@ from rn_core import init_project,load,ResearchError
 from rn_interview import start,add_questions,answer,read,frontier,request_exit,confirm_exit,pause,resume,handoff
 from rn_interview_choices import (validate_choices,answer_fields,codex_request,
                                   codex_async_request,resolve_async_reply,
-                                  resolve_codex_answer,text_prompt)
+                                  resolve_codex_answer,text_prompt,delivery_plan)
 from build_canvas import build_canvas
 
 def choices():
@@ -227,6 +227,101 @@ class ChoiceTests(unittest.TestCase):
                          capture_output=True,text=True,check=True)
         self.assertEqual(json.loads(r.stdout)["resolved"]["choice_id"],"accuracy")
         self.assertEqual(read(self.root)["revision"],before)
+    def test_no_native_tool_plan_uses_normal_chat_with_other_and_supplement(self):
+        question=self.add()
+        data=delivery_plan(question,capability="none")
+        self.assertEqual(data["mode"],"chat")
+        self.assertFalse(data["native_tool_called"])
+        self.assertIsNone(data["native_tool"])
+        self.assertIn("其他／自定义",data["fallback_text"])
+        self.assertIn("补充说明（可选）",data["fallback_text"])
+        self.assertIn("A. 提高精度",data["fallback_text"])
+        self.assertTrue(data["requires_explicit_user_confirmation"])
+    def test_native_failure_or_cancel_always_falls_back(self):
+        item=self.add()
+        for capability in ("none","sync","async"):
+            for fail in ("unavailable","error","timeout","cancelled","no-answer"):
+                with self.subTest(capability=capability,reason=fail):
+                    plan=delivery_plan(item,capability=capability,failure=fail)
+                    self.assertEqual(plan["mode"],"chat")
+                    self.assertIsNone(plan["native_arguments"])
+                    self.assertIn("其他／自定义",plan["fallback_text"])
+                    self.assertIn("补充说明",plan["fallback_text"])
+        self.assertEqual(read(self.root)["questions"][0]["status"],"pending")
+    def test_native_synchronous_and_asynchronous_are_only_candidates(self):
+        item=self.add()
+        for mode,tool in (("sync","request_user_input"),("async","request_user_input_async")):
+            plan=delivery_plan(item,capability=mode)
+            self.assertEqual(plan["mode"],"native-candidate")
+            self.assertEqual(plan["native_tool"],tool)
+            self.assertFalse(plan["native_tool_called"])
+            self.assertFalse(plan["user_answer_received"])
+            self.assertIn("其他／自定义",plan["fallback_text"])
+    def test_four_choices_fallback_preserves_all_choices(self):
+        data=q()
+        data["choices"].append({"id":"speed","label":"训练速度","description":"减少等待"})
+        item=self.add(data)
+        result=delivery_plan(item,capability="sync")
+        self.assertEqual(result["mode"],"chat")
+        self.assertIn("D. 训练速度",result["fallback_text"])
+        self.assertIn("其他／自定义",result["fallback_text"])
+        self.assertIn("补充说明",result["fallback_text"])
+    def test_preset_choice_with_supplement_persists_across_sessions(self):
+        self.add()
+        original="但我希望在保证准确率的前提下控制预算"
+        answer(self.root,"Q-0001",choice_id="accuracy",supplement=original)
+        selected=read(self.root)["questions"][0]
+        self.assertEqual(selected["selected_option_id"],"accuracy")
+        self.assertEqual(selected["supplement"],original)
+        self.assertEqual(selected["answer"],"提高精度")
+        packet=handoff(self.root)
+        self.assertEqual(packet["confirmed"][0]["supplement"],original)
+        pause(self.root);resume(self.root)
+        self.assertEqual(read(self.root)["questions"][0]["supplement"],original)
+    def test_other_and_free_text_can_include_extra_explanation(self):
+        self.add()
+        answer(self.root,"Q-0001",choice_id="other",
+               custom_answer="研究数据漂移",supplement="要先收集各站点分布")
+        result=read(self.root)["questions"][0]
+        self.assertEqual(result["custom_answer"],"研究数据漂移")
+        self.assertEqual(result["supplement"],"要先收集各站点分布")
+        answer(self.root,"Q-0001",answer_text="新思路",
+               supplement="原因是基线无法比较",revise=True)
+        result=read(self.root)["questions"][0]
+        self.assertEqual(result["answer_source"],"free-text")
+        self.assertEqual(result["supplement"],"原因是基线无法比较")
+        self.assertIsNone(result["selected_option_id"])
+    def test_blank_invalid_supplement_rejected_without_writes(self):
+        self.add()
+        before=read(self.root)
+        for val in ("", "   ", "x"*12001):
+            with self.subTest(value_length=len(val)):
+                with self.assertRaises(ResearchError):
+                    answer(self.root,"Q-0001",choice_id="cost",supplement=val)
+        self.assertEqual(read(self.root),before)
+    def test_revision_clears_dependent_supplement(self):
+        self.add()
+        self.add(q(["Q-0001"]))
+        answer(self.root,"Q-0001",choice_id="accuracy",supplement="初始约束")
+        answer(self.root,"Q-0002",choice_id="cost",supplement="依赖初始假设")
+        answer(self.root,"Q-0001",choice_id="other",custom_answer="换新的目标",revise=True)
+        dep=read(self.root)["questions"][1]
+        self.assertEqual(dep["status"],"unresolved")
+        self.assertIsNone(dep["supplement"])
+        self.assertIsNone(dep["selected_option_id"])
+    def test_cli_present_fallback_is_read_only(self):
+        self.add()
+        argv=[sys.executable,str(Path(__file__).resolve().parents[1]/"scripts"/"interview.py"),
+              str(self.root),"present","--question","Q-0001"]
+        rev=read(self.root)["revision"]
+        proc=subprocess.run(argv,capture_output=True,text=True,check=True)
+        result=json.loads(proc.stdout)
+        self.assertEqual(result["mode"],"chat")
+        self.assertIn("补充说明",result["fallback_text"])
+        proc=subprocess.run(argv+["--capability","sync","--failure","error"],
+                            capture_output=True,text=True,check=True)
+        self.assertEqual(json.loads(proc.stdout)["mode"],"chat")
+        self.assertEqual(read(self.root)["revision"],rev)
     def test_canvas_is_still_read_only_and_escapes(self):
         d=q(title='<script>alert("x")</script>')
         self.add(d)
