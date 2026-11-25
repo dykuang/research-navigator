@@ -48,6 +48,7 @@ p{line-height:1.6}code{overflow-wrap:anywhere}
 .choice{display:block;border:1px solid #d4e0e9;border-radius:8px;margin:6px 0;padding:9px;cursor:pointer}
 .choice input{margin-right:8px}.other-input{display:block;width:100%;max-width:100%;min-height:75px;
 margin:8px 0;padding:8px;border:1px solid #b6c7d4;border-radius:8px}
+.other-input[hidden],.draft[hidden]{display:none}
 button{background:#176a82;color:white;padding:8px 14px;border:0;border-radius:8px;cursor:pointer}
 button:disabled{background:#a7b6c2;cursor:not-allowed}.draft{white-space:pre-wrap;overflow-wrap:anywhere}
 .choice:focus-within{outline:2px solid #176a82}
