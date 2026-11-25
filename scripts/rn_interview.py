@@ -243,6 +243,16 @@ def frontier(doc,limit=MAX_QUESTIONS_PER_ROUND):
     if not isinstance(limit,int) or isinstance(limit,bool) or not 1<=limit<=MAX_QUESTIONS_PER_ROUND:
         raise ResearchError("frontier limit must be 1–5")
     _validate_frontier_input(doc)
+    # Completed/abandoned interviews are historic, not an active question queue.
+    # Paused and consensus-review interviews still expose pending context for
+    # human review and explicit resumption.
+    if doc.get("status") in ("completed", "abandoned"):
+        return {"interview_id":doc["interview_id"],"status":doc["status"],
+                "revision":doc["revision"],"topic":doc["topic"],
+                "ready":[],"blocked":[],
+                "open_count":sum(q["status"]!="answered" for q in doc["questions"]),
+                "accepted_open_questions":list(doc.get("accepted_open_questions",[])),
+                "requires_explicit_exit_confirmation":False}
     byid=_questions(doc)
     ready=[copy.deepcopy(q) for q in doc["questions"]
            if q["status"] in ("pending","deferred","unresolved")
