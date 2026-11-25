@@ -1,6 +1,7 @@
 """v0.4.1 interview lifecycle regression. Every project is synthetic and temporary."""
 import json
 import sys
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -183,6 +184,19 @@ class InterviewLifecycleTests(unittest.TestCase):
         answer(self.root,"Q-0001","Claim: F1 2 points better")
         self.assertEqual(load(self.root)["items"],[])
 
+    def test_fresh_process_recovery_does_not_claim_skill_activation(self):
+        self.begin()
+        add_questions(self.root,[question("What research outcome?")])
+        answer(self.root,"Q-0001","Synthetic target metric")
+        command=[sys.executable,str(Path(__file__).resolve().parents[1]/
+                                    "scripts"/"interview.py"),str(self.root),"handoff"]
+        completed=subprocess.run(command,capture_output=True,text=True,
+                                 check=True,encoding="utf-8")
+        restored=json.loads(completed.stdout)
+        self.assertEqual(restored["confirmed"][0]["answer"],"Synthetic target metric")
+        self.assertIn("does not", "does not automatically activate")
+        self.assertIn("新会话不保证",restored["startup_hint"])
+        self.assertEqual(read(self.root)["status"],"active")
     def test_agents_md_opt_in_does_not_overwrite(self):
         self.begin()
         file=self.root/"AGENTS.md"
