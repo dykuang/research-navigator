@@ -181,6 +181,13 @@ class ChoiceTests(unittest.TestCase):
         self.assertTrue(d["async_ack_is_not_user_answer"])
         self.assertFalse(d["tool_called"])
         self.assertEqual(read(self.root)["revision"],before)
+    def test_async_legacy_free_text_does_not_invent_choice(self):
+        question=self.add(q(structured=False))
+        self.assertEqual(codex_async_request(question)["questions"][0],
+                         {"title":question["text"]})
+        self.assertEqual(resolve_async_reply(question,"Original idea"),
+                         {"choice_id":None,"custom_answer":None,
+                          "answer_text":"Original idea"})
     def test_native_ambiguous_values_refused(self):
         x=self.add()
         bad=[
