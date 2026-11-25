@@ -129,3 +129,5 @@ v0.4.2 在 v0.4.1 的持久访谈上添加结构化回答选项、任何题目�
 
 这不是 v0.4.2 正式发布声明。Codex 客户端原生提问界面依赖当前模式；仅生成 JSON 请求不等于实际显示。HTML 也不执行真实回答写入或科研批准。
 
+
+Codex 的部分默认模式还提供非阻塞 `request_user_input_async`，需要单独格式 `title + options`。工具的 `accepted=true` 只表示请求送达，不是用户回答。详见 [v0.4.2 指南](references/interview-v042.md)；界面实际呈现必须在用户的客户端验收。
