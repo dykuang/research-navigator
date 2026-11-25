@@ -75,3 +75,18 @@ python scripts/interview.py PROJECT_ROOT resolve-async --question Q-0001 --text 
 
 The agent must inspect the actual currently available tool names. Prefer a blocking picker where supported for a decision that must be answered before progressing. If only the async picker is offered, send the question, **do not continue dependent work until a real user message arrives**, and never treat `accepted=true` as an answer. If cards do not appear or remain pending unexpectedly, send the full text question via `prompt` rather than claim the UI succeeded. Native async display and reply lifecycle vary by client and OS; this adapter is a tested formatter, not an end-to-end client integration.
 
+
+## Guaranteed ordinary-chat fallback and additional user notes (#56)
+
+Always prepare `python scripts/interview.py PROJECT_ROOT present --question Q-0001` before the UI attempt. It returns `fallback_text`, plus a native candidate *only if* the caller explicitly states a capability actually present in the Codex runtime. `--capability none` is the default. `--capability sync` or `async` previews the corresponding request and retains the complete text fallback. **None of these commands displays a popup by itself.**
+
+For missing or failed UI, run `present --question Q-0001 --capability sync --failure unavailable` (or `error`, `timeout`, `cancelled`, `no-answer`), then ask the returned `fallback_text` in ordinary conversation. Do not silently truncate a four-or-more-choice question, and never interpret async delivery `accepted=true` as a selection.
+
+A user may select A/B/C **and additionally type their own constraint or reasoning**:
+
+```bash
+python scripts/interview.py PROJECT_ROOT answer --question Q-0001 --choice accuracy --supplement "希望尽量减少计算开销" --actor user
+python scripts/interview.py PROJECT_ROOT answer --question Q-0001 --choice other --custom-answer "我更看重鲁棒性" --supplement "先对两个独立站点做测试" --actor user
+```
+
+The optional `supplement` is persisted with selected_option_id and custom_answer, included in cross-session handoff, validated as human-confirmed data, and invalidated when an upstream confirmed premise changes. Old records without `supplement` still load. The offline Canvas offers an optional additional explanation field for both preset and Other choices, but only creates a copyable draft rather than writing a confirmed answer.
