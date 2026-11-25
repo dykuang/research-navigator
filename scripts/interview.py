@@ -5,6 +5,7 @@ import json
 import sys
 
 from rn_core import ResearchError, paths
+from rn_interview_choices import codex_request, text_prompt, resolve_codex_answer
 from rn_interview import (start,read,add_questions,answer,pause,resume,request_exit,
                           reject_exit,confirm_exit,abandon,reopen,frontier,handoff)
 
@@ -12,7 +13,7 @@ def main():
     p=argparse.ArgumentParser(description="Persistent, explicit v0.4.1 research grilling interview")
     p.add_argument("root",help="Existing initialized research project ROOT")
     sub=p.add_subparsers(dest="command",required=True)
-    for cmd in ("start","status","add-questions","answer","next","pause","resume",
+    for cmd in ("start","status","add-questions","answer","next","prompt","native-request","resolve-native","pause","resume",
                 "request-exit","reject-exit","confirm-exit","abandon","reopen","handoff"):
         sp=sub.add_parser(cmd)
         if cmd=="start":
@@ -25,7 +26,14 @@ def main():
             sp.add_argument("--text",default="")
             sp.add_argument("--status",choices=("answered","deferred","unresolved"),default="answered")
             sp.add_argument("--revise",action="store_true")
+            sp.add_argument("--choice",help="Stable choice ID or other for free-form response")
+            sp.add_argument("--custom-answer",help="Original user text; requires --choice other")
         if cmd=="next":sp.add_argument("--limit",type=int,default=5)
+        if cmd in ("prompt","native-request","resolve-native"):
+            sp.add_argument("--question",required=True)
+        if cmd=="resolve-native":
+            sp.add_argument("--response-json",required=True,
+                            help="Native request_user_input return JSON, for inspection only")
         if cmd in ("request-exit","reject-exit","abandon","reopen"):
             sp.add_argument("--reason",required=True)
         if cmd=="confirm-exit":
@@ -50,8 +58,30 @@ def main():
                   "accepted_open_questions":x["accepted_open_questions"]}
         elif c=="add-questions":data=add_questions(args.root,json.loads(args.questions_json),**common)
         elif c=="answer":
-            data=answer(args.root,args.question,args.text,status=args.status,revise=args.revise,**common)
+            data=answer(args.root,args.question,args.text,status=args.status,
+                        revise=args.revise,choice_id=args.choice,
+                        custom_answer=args.custom_answer,**common)
         elif c=="next":data=frontier(read(args.root),args.limit)
+        elif c in ("prompt","native-request","resolve-native"):
+            document=read(args.root)
+            questions={q["id"]:q for q in document["questions"]}
+            selected=questions.get(args.question)
+            if selected is None:raise ResearchError("unknown question ID")
+            allowed={q["id"] for q in frontier(document)["ready"]}
+            if document["status"]!="active" or args.question not in allowed:
+                raise ResearchError("question is not available for an active interview")
+            if c=="prompt":data={"question_id":selected["id"],"text":text_prompt(selected),
+                                  "interactive_ui":False,"writeback":False}
+            elif c=="native-request":
+                data={"tool_name":"request_user_input",
+                      "tool_arguments":codex_request(selected),
+                      "must_check_runtime_capability":True,
+                      "tool_called":False,
+                      "other_is_client_supplied":True,
+                      "writeback":False}
+            else:
+                data={"resolved":resolve_codex_answer(selected,json.loads(args.response_json)),
+                      "requires_explicit_user_confirmation":True,"writeback":False}
         elif c=="pause":data=pause(args.root,**common)
         elif c=="resume":data=resume(args.root,**common)
         elif c=="request-exit":data=request_exit(args.root,args.reason,**common)
