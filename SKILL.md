@@ -30,6 +30,20 @@ description: Use when a student or advisor wants to initiate, scope, investigate
 
 科研推理画布的 `reasoning` 视图与节点详情为只读；v0.2 受保护的本机提案桥仍负责既有语义写入。不得把 CLI 中的 `--actor` 当作真实身份认证，也不得声称 v0.3 已发布稳定版。
 
+## v0.4.1 · Grilling 访谈模式（生命周期，而非一次性问答）
+
+**只在用户明确要求开启或继续密集访谈时进入。**用户只问使用方法时先解释，不初始化或修改研究数据。使用 `scripts/interview.py PROJECT_ROOT start --topic ...` 显式开启持久访谈；有 `research/interviews/current.json` 时先运行 `status`、`next`，不能重复 start 或假定空白项目。
+
+- **每一轮都要继续使用本 Skill 访谈协议**：先检查状态及依赖，选择 1–5 个重要且彼此独立的前沿问题（推荐 2–5，边界少可更少）；问清楚 WHY、选项与权衡、建议及最低成本验证，使用 `add-questions` 保存问题（JSON 字段见 `references/interview-v041.md`）。不要仅靠模型短期聊天记忆来保存持续模式。
+- 用户回答后，用 `answer --question Q-0001 --text '...' --actor user` 记录**明确确认**的答案；暂缓/有争议的回答分别标记 `deferred` / `unresolved`，前置问题未确认就不能推进依赖问题。真正科学证据的确认仍走原科研状态系统，访谈答案不等于实验验证。
+- 如果用户对已确认答案提出修正，需 `--revise` 并重新检查受影响的下游问题。不能悄悄把用户回答改成 Agent 结论。
+- 会话停止时可以 `pause`，更换新 Codex Session 时用户需**重新明确调用** `$research-navigator` 或通过显式启用的项目 `AGENTS.md` 引导恢复。同一个项目根目录中用 `status`、`next`、`handoff` 恢复；新会话不会自动继承之前的 Skill 调用，不能向用户保证后台长期持续激活。
+- 达成较多共识时 Agent 提议 `request-exit --reason '共识摘要及仍未解决的问题'`，**不要自行退出 Grilling**。用户可以 `reject-exit` 继续，或 `confirm-exit` 明确确认；未解决的每个问题必须分别通过 `--accept-open Q-NNNN` 被明确接受。在 `completed` 后回到普通科研助手模式，不再强制 Grilling，除非用户请求 `reopen`。
+- 不得用 `--actor user` 冒充真实身份。CLI 的 actor 是记载来源的声明，不是安全的身份验证。助手只能在用户实际明确授权之后调用对应人类确认命令。
+- 生成 Dashboard 时若项目已有访谈，`research/canvas/interview.html` 展示**只读访谈快照**。网页不会审批、自动进入访谈或创建提案；访谈 sidecar 与 `research/state/*.json` 的权威科学状态分离。
+
+按需参考 `references/interview-v041.md`、`references/interaction-protocol.md`；新用户帮助由 `ask-research-navigator` 提供。项目本地可选的 AGENTS.md 引导仅在用户明确执行 `python scripts/install_interview_guidance.py PROJECT_ROOT --apply` 后写入，不自动修改全局 Agent 行为。
+
 ## 先做什么
 
 1. 找到用户指定的**科研项目根目录**（不是本 Skill 安装目录）。检查 `RESEARCH.md`、`CONTEXT.md`、`research/state/`、现有研究记录、Git 状态；现有内容优先，不得无故覆盖。
