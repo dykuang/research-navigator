@@ -28,3 +28,16 @@ Never ask users to look up accessible facts you could verify yourself with autho
 ## Avoid re-asking
 
 Query existing items + relevant files first. If the student says "继续昨天的工作", summarize 2–3 established facts, 1–2 pending decisions, then resume the frontier, rather than asking the complete onboarding questions again.
+
+## v0.4.1 Persistent Grilling rounds and stop handshake
+
+This protocol applies **while** `research/interviews/current.json` reports `active` or `consensus-review`. It is not a globally sticky prompt. The user must explicitly invoke the Research Navigator Skill in a newly independent Agent/Codex chat, or opt into project-local `AGENTS.md` guidance; the file alone cannot activate a model or a Skill.
+
+1. On entry, inspect the project and run `scripts/interview.py PROJECT_ROOT status` and `next`. If no sidecar and user requested Grilling, explicitly `start` after checking the project root. Otherwise do normal research work or help, without implicit start.
+2. Present only the highest-value independent frontier questions (1–5), each with why it matters, alternatives and costs, reasoned recommendation, and a cheap way to decide. Persist unanswered questions with the CLI rather than repeating them on every turn.
+3. After a user replies, **confirm or qualify** the answer before persisting it. Confirmed answer → `answered`; needs information → `deferred`; unresolved contradiction → `unresolved`. Never silently promote user assertions to peer-reviewed evidence; use normal research state commands for evidence.
+4. Use the CLI's dependency DAG and `next` to select new questions. Do not advance an unconfirmed dependent question; do not re-ask a settled question unless a premise changed. Changes to confirmed premises require `--revise`, which marks downstream confirmed answers unresolved.
+5. Periodically synthesize agreed definitions, assumptions, constraints, open scientific risks and the proposed next validation step. Even if no questions remain, ask for explicit exit confirmation.
+6. Exit only via `request-exit` → review summary with user → `confirm-exit` by user/mentor, naming each accepted open issue. If they disagree, `reject-exit` and continue. On `completed`, normal assistant mode resumes; restart only by explicit `reopen` or a new interview after archiving the old record.
+
+Cross-session handoff: use `scripts/interview.py PROJECT_ROOT handoff` (read-only) and pass the actual project location in the new session. This restores research interview state, not the prior chat text or implicit Skill activation. See `references/interview-v041.md`.

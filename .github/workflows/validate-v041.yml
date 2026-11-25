@@ -1,0 +1,53 @@
+name: Validate Research Navigator v0.4.1
+on:
+  push:
+    branches: [feat/v0.4.1-interview-lifecycle]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  interview-python:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.10"
+          - os: ubuntu-latest
+            python: "3.12"
+          - os: windows-latest
+            python: "3.12"
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Compile Python scripts
+        run: python -m compileall -q scripts evals
+      - name: All v0.1–v0.4.1 Python regressions
+        run: python -m unittest discover -s evals -p "test_*.py" -v
+      - name: Multi-round and recovery research UAT
+        run: python evals/uat_v041_multiround.py
+      - name: v0.4 synthetic researcher journeys
+        run: python evals/uat_v04_researcher_rounds.py
+  interview-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright Chromium
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: New interview HTML and previous Canvas regression
+        run: python evals/browser_check_v041.py
+      - name: v0.4 decision browser regression
+        run: python evals/browser_check_v04.py

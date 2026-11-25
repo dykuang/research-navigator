@@ -108,3 +108,17 @@ v0.4.0 在已有 v0.3 科学推理图上新增只读决策辅助，正式发布�
 - `python scripts/build_dashboard.py PROJECT_ROOT` — 保留原工作台与画布，额外生成 `research/canvas/decisions.html` 离线只读决策页（非实时审批 UI）。
 
 架构约束：当前项目状态 schema 仍为 `0.2.0`，v0.4 为派生分析层，不另建权威科学数据库。新建议不改变 `workflow / epistemic / review / outcome / lifecycle`，不自动将负结果视作科学证伪，也不基于未经验证的来源宣称有文献共识。详见 `references/decision-v04.md`、`docs/roadmap/v0.4.md`。
+
+## v0.4.1 · Persistent Research Grilling（开发分支）
+
+本版本针对「在新会话回答后，Research Navigator 会不会继续追问」的问题增加**显式启动、持续访谈、跨会话状态恢复、用户确认退出**的生命周期。它不让一个新独立 Codex Session 自动继承旧的 Skill 调用，恢复仍需显式 `$research-navigator` 或用户主动安装项目级 `AGENTS.md` 指引。
+
+- `scripts/rn_interview.py` — `research/interviews/current.json` 持久化状态机，独立于科学状态、锁和原子写入、修订检查、审计记录。
+- `scripts/interview.py` — `start`、`add-questions`、`answer`、`next`、`pause`、`resume`、`request-exit`、`reject-exit`、`confirm-exit`、`handoff`。
+- `scripts/install_interview_guidance.py PROJECT_ROOT` 先只读预览，`--apply` 才在项目根目录追加 `AGENTS.md` 指引；不改全局设置。
+- `scripts/build_dashboard.py PROJECT_ROOT` 为已有访谈生成 `research/canvas/interview.html` 离线只读快照，不改变任何研究状态。
+- 完整状态转换、数据模型、CLI 示例、Agent/Windows 限制见 [访谈协议](references/interview-v041.md) 和 [v0.4.1 Roadmap](docs/roadmap/v0.4.1.md)。
+
+**最简单的使用方式：** 已安装 Skill 的 Codex 中明确说「在这个研究项目使用 research-navigator 开始 Grilling，多轮追问直到我确认结束；下次继续之前读取 `interview.py status/next`」。若更换全新对话，会再次显式引用 Skill；**记录持久不代表 Skill 永远自动激活**。
+
+v0.4.1 的 Agent 长会话行为与用户 Windows/Codex 环境仍需要人工验收，CLI 的 `--actor user` 不是身份认证。Release 发布以 GitHub 上正式 tag 为准，开发分支不代表稳定版本。

@@ -39,7 +39,10 @@ def build_canvas(root):
     # The authenticated local bridge remains responsible for interactive proposals.
     from build_decision import build as build_decision
     build_decision(root)
+    from build_interview import build as build_interview
+    interview_page=build_interview(root)
     html=html.replace('<a href="../dashboard/index.html">返回经典工作台</a>',
+                      ('<a href="interview.html">科研访谈</a> · ' if interview_page else '') +
                       '<a href="decisions.html">研究决策</a> · <a href="../dashboard/index.html">返回经典工作台</a>')
     atomic_text(dest,html)
     return dest

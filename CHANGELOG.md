@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — v0.4.1 Persistent Research Grilling
+
+- Added durable interview sidecar and question frontier DAG with confirmation, deferral, revision propagation and explicit consensus exit.
+- Added project-local read-only handoff and offline HTML interview Canvas page.
+- Added opt-in AGENTS.md project guidance; **does not cause fresh independent Codex sessions to automatically inherit Skill invocation**.
+- Added Python Linux/Windows and Chromium multi-round tests. No canonical scientific state migration.
+- No v0.4.1 official tag/release yet; PR review required.
+
+
 ## Unreleased — v0.3 Scientific Reasoning Graph
 
 - Added canonical `ExperimentRun` and `DecisionTrace` entities without replacing the v0.2 storage schema.
