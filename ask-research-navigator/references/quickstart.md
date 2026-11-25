@@ -46,3 +46,8 @@ python scripts/build_dashboard.py C:\\Temp\\rn-synthetic
 **换一个完全独立的对话**：再次明确调用 `$research-navigator`，提供**同一项目根目录**，说「请读取持久访谈进度，不要重新从头问」。新对话不会天然继承此前的 Skill 上下文；存档让恢复成为可能，但不是自动激活。
 
 **退出**：Agent 先汇总已解决、未解决和需要进一步实验的事项并请求审核；你明确同意后才进入普通科研助手模式。完整命令见 `research-navigator/references/interview-v041.md`。
+
+## v0.4.2 交互式 Grilling
+
+对每个问题，既可以选择 Agent 的推荐或其他备选，也可以输入自己的研究想法（「其他／自定义」）。如果当前 Codex 模式不提供原生选择控件，Agent 应用文本选项同样支持自定义回答。重新进入独立聊天仍需显式调用 Skill 并指定同一项目目录；已保存的答案可以恢复。
+
