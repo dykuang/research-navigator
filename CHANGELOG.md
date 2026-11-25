@@ -72,3 +72,7 @@ See [v0.2 release checklist](docs/release-v0.2.md), [Canvas guide](references/ca
 - Mentor decision brief with scientific Milestone evidence gates.
 - Offline Research Canvas decision report and cross-platform CI.
 - Canonical project schema 0.2.0 and v0.3 approvals remain unchanged. Six synthetic multi-round researcher UAT scenarios (24 rounds) and cross-platform CI passed; see docs/uat-report-v0.4-2026-11-23.md.
+
+- Guaranteed normal-chat fallback for unsupported/failing/cancelled/no-response native Codex question UI; textual options always include Other and optional supplementary explanation.
+- Saved per-answer supplementary user comments across sessions, including alongside a preset choice, with independent confirmation and revision protection.
+- New issue #56 safety tests cover failure modes and Chromium unsaved drafts. No automatic UI success claim.
