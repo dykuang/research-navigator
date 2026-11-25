@@ -401,7 +401,10 @@ def reopen(root,reason,actor="user",expected_revision=None):
 def handoff(root):
     doc=read(root)
     f=frontier(doc)
-    resolved=[{"id":q["id"],"question":q["text"],"answer":q["answer"]}
+    resolved=[{"id":q["id"],"question":q["text"],"answer":q["answer"],
+               "selected_option_id":q.get("selected_option_id"),
+               "custom_answer":q.get("custom_answer"),
+               "answer_source":q.get("answer_source","free-text")}
               for q in doc["questions"] if q["status"]=="answered"]
     return {"project_root":str(paths(root)["root"]),
             "interview_id":doc["interview_id"],
