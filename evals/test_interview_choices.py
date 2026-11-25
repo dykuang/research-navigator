@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
 
 from rn_core import init_project,load,ResearchError
-from rn_interview import start,add_questions,answer,read,frontier,request_exit,confirm_exit,pause,resume
+from rn_interview import start,add_questions,answer,read,frontier,request_exit,confirm_exit,pause,resume,handoff
 from rn_interview_choices import (validate_choices,answer_fields,codex_request,
                                   resolve_codex_answer,text_prompt)
 from build_canvas import build_canvas
@@ -61,6 +61,29 @@ class ChoiceTests(unittest.TestCase):
         self.assertEqual(reloaded["answer_source"],"other")
         pause(self.root);resume(self.root)
         self.assertEqual(read(self.root)["questions"][0]["custom_answer"],msg)
+    def test_cross_session_handoff_preserves_custom_and_selected_id(self):
+        self.add()
+        text="我想研究新的范式"
+        answer(self.root,"Q-0001",choice_id="other",custom_answer=text)
+        packet=handoff(self.root)
+        self.assertEqual(packet["confirmed"][0]["selected_option_id"],"other")
+        self.assertEqual(packet["confirmed"][0]["custom_answer"],text)
+        self.assertEqual(packet["confirmed"][0]["answer_source"],"other")
+    def test_typed_question_without_legacy_options_string(self):
+        spec=q()
+        del spec["options"]
+        self.add(spec)
+        saved=read(self.root)["questions"][0]
+        self.assertIn("提高精度",saved["options"])
+        self.assertEqual(len(saved["choices"]),3)
+    def test_native_recommended_label_round_trip(self):
+        item=self.add()
+        req=codex_request(item)
+        self.assertEqual(req["questions"][0]["options"][0]["label"],
+                         "提高精度 (Recommended)")
+        result=resolve_codex_answer(item,{
+            "answers":{"q_0001":{"answers":["提高精度 (Recommended)"]}}})
+        self.assertEqual(result["choice_id"],"accuracy")
     def test_other_without_text_cannot_confirm(self):
         self.add()
         for c in ("", "   "):
