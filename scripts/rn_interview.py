@@ -11,6 +11,7 @@ import uuid
 from pathlib import Path
 
 from rn_core import ResearchError, atomic_json, load, now, paths, read_json, workspace_lock
+from rn_interview_choices import validate_choices, answer_fields
 
 VERSION = "interview-v1"
 STATUSES = ("active", "paused", "consensus-review", "completed", "abandoned")
@@ -74,6 +75,22 @@ def _validate(doc, project):
         for k in ("why","options","recommendation","lowest_cost_check"):
             if not isinstance(q.get(k),str) or not q[k].strip():
                 raise ResearchError("question missing guidance: "+k)
+        if "choices" in q:
+            validate_choices(q["choices"], q.get("recommended_choice_id"))
+        if "selected_option_id" in q:
+            selected=q["selected_option_id"]
+            origin=q.get("answer_source")
+            if selected is not None:
+                if q.get("status")!="answered":
+                    raise ResearchError("unconfirmed question must clear selected choice")
+                if origin not in ("choice","other"):
+                    raise ResearchError("invalid answer source")
+                normalized=answer_fields(q,"",choice_id=selected,
+                    custom_answer=q.get("custom_answer"))
+                if normalized["answer"]!=q.get("answer"):
+                    raise ResearchError("selected answer does not match option or custom answer")
+            elif origin not in (None,"free-text","unanswered"):
+                raise ResearchError("invalid free-text answer source")
         if q.get("status") not in QUESTION_STATES:
             raise ResearchError("invalid question state")
         if not isinstance(q.get("depends_on"),list) or len(set(q["depends_on"]))!=len(q["depends_on"]):
@@ -187,25 +204,33 @@ def add_questions(root,questions,*,actor="agent",expected_revision=None):
             n=1
             while "Q-%04d"%n in ids:n+=1
             qid="Q-%04d"%n
+            if "choices" in data:
+                validate_choices(data["choices"],data.get("recommended_choice_id"))
+            elif "recommended_choice_id" in data:
+                raise ResearchError("recommended choice requires structured choices")
             q={"id":qid,"text":data["text"].strip(),"why":data["why"].strip(),
                "options":data["options"].strip(),
+               **({"choices":copy.deepcopy(data["choices"]),
+                   "recommended_choice_id":data.get("recommended_choice_id")}
+                  if "choices" in data else {}),
                "recommendation":data["recommendation"].strip(),
                "lowest_cost_check":data["lowest_cost_check"].strip(),
                "depends_on":list(dependencies),"status":"pending","answer":"",
-               "confirmed_by":None,"round":doc["round"],"answered_at":None}
+               "confirmed_by":None,"round":doc["round"],"answered_at":None,
+               "selected_option_id":None,"custom_answer":None,"answer_source":"unanswered"}
             ids.add(qid)
             doc["questions"].append(q);newly.append(qid)
         _event(doc,"questions-added",actor,{"ids":newly,"round":doc["round"]})
     return _mutate(root,op,expected_revision=expected_revision)
 
 def answer(root,question_id,answer_text="",*,status="answered",actor="user",
-           revise=False,expected_revision=None):
+           revise=False,expected_revision=None,choice_id=None,custom_answer=None):
     _human(actor)
     if status not in ("answered","deferred","unresolved"):
         raise ResearchError("answer status must be answered, deferred or unresolved")
     if not isinstance(answer_text,str) or len(answer_text)>MAX_ANSWER_TEXT:
         raise ResearchError("answer text too long or invalid")
-    if status=="answered" and not answer_text.strip():
+    if status=="answered" and choice_id is None and not answer_text.strip():
         raise ResearchError("请给出具体回答，或标记 deferred/unresolved")
     def op(doc):
         if doc["status"]!="active":
@@ -218,8 +243,18 @@ def answer(root,question_id,answer_text="",*,status="answered",actor="user",
         if any(prior[d]["status"]!="answered" for d in q["depends_on"]):
             raise ResearchError("前置问题尚未得到确认，不能回答依赖问题")
         old=q["status"]
+        if status=="answered":
+            fields=answer_fields(q,answer_text,choice_id,custom_answer)
+        else:
+            if choice_id is not None or custom_answer is not None:
+                raise ResearchError("deferred/unresolved cannot select a confirmed choice")
+            fields={"answer":answer_text.strip(),"selected_option_id":None,
+                    "custom_answer":None,"answer_source":"unanswered"}
         q["status"]=status
-        q["answer"]=answer_text.strip()
+        q["answer"]=fields["answer"]
+        q["selected_option_id"]=fields["selected_option_id"]
+        q["custom_answer"]=fields["custom_answer"]
+        q["answer_source"]=fields["answer_source"]
         q["confirmed_by"]=actor if status=="answered" else None
         q["answered_at"]=now()
         affected=[]
@@ -232,11 +267,16 @@ def answer(root,question_id,answer_text="",*,status="answered",actor="user",
                     # A changed confirmed premise invalidates downstream answers.
                     if other["status"]=="answered":
                         other["status"]="unresolved";other["confirmed_by"]=None
+                        other["selected_option_id"]=None
+                        other["custom_answer"]=None
+                        other["answer_source"]="unanswered"
                         affected.append(other["id"])
                     children.add(other["id"])
         _event(doc,"answer-"+status,actor,
                {"question_id":question_id,"revise":revise,
-                "invalidated_dependents":affected})
+                "invalidated_dependents":affected,
+                "selected_option_id":q["selected_option_id"],
+                "answer_source":q["answer_source"]})
     return _mutate(root,op,expected_revision=expected_revision)
 
 def frontier(doc,limit=MAX_QUESTIONS_PER_ROUND):
