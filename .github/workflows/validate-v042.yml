@@ -50,7 +50,7 @@ jobs:
       - run: |
           python -m pip install playwright
           python -m playwright install --with-deps chromium
-      - name: Interactive choice cards: Other and mobile
+      - name: "Interactive choice cards: Other and mobile"
         run: python evals/browser_check_v042.py
       - name: Previous interview and decision Canvas regressions
         run: |
