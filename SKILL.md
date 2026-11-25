@@ -44,6 +44,16 @@ description: Use when a student or advisor wants to initiate, scope, investigate
 
 按需参考 `references/interview-v041.md`、`references/interaction-protocol.md`；新用户帮助由 `ask-research-navigator` 提供。项目本地可选的 AGENTS.md 引导仅在用户明确执行 `python scripts/install_interview_guidance.py PROJECT_ROOT --apply` 后写入，不自动修改全局 Agent 行为。
 
+
+## v0.4.2 · 结构化问答、Other 自由输入和 Codex 原生交互降级
+
+Grilling 每道题必须允许用户拒绝已有备选项并给出**其他／自定义**答案；不要把推荐选项当作自动确认结果。建议创建 `choices`（稳定 ID、显示标签、利弊说明）和可选 `recommended_choice_id`，优先 2–3 项；旧版仅含 `options` 字符串的问题继续支持完整自由回答。详见 `references/interview-v042.md`。
+
+在 Codex 运行时**实际提供** `request_user_input` 工具的模式中，可以优先调用真实工具，以 1–3 个问题和每题 2–3 个选项展示原生选择器。**不得手工插入 Other 到 native options**：支持的客户端自行添加输入框。调用前可用 `python scripts/interview.py PROJECT_ROOT native-request --question Q-0001` 获得只读建议参数，但该 CLI **没有**真正显示 UI，返回 `tool_called=false`。检查工具实际可用性，不支持时改用 `prompt --question Q-0001` 文本展示 A/B/C/其他。四个以上选项也须完整文本展示，不能静默截断。
+
+用户选定固定项后，在实际确认基础上使用 `answer --question Q-0001 --choice CHOICE_ID --actor user`；用户选 Other 时用 `--choice other --custom-answer '用户原话'`；旧版 `--text` 仍可使用。Codex 原生回包可以先用 `resolve-native --response-json` 只读解释，未知选项应追问，不能静默写入状态。受影响下游问题仍必须在 `--revise` 后重新确认。离线 HTML 提供选项控件但只能生成可复制的回答草案，**不保存、不代替授权**。
+
+
 ## 先做什么
 
 1. 找到用户指定的**科研项目根目录**（不是本 Skill 安装目录）。检查 `RESEARCH.md`、`CONTEXT.md`、`research/state/`、现有研究记录、Git 状态；现有内容优先，不得无故覆盖。
