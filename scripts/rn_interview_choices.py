@@ -79,12 +79,17 @@ def codex_request(question):
     if len({x["label"] for x in choices})!=len(choices):
         raise ResearchError("ambiguous native choice labels")
     header="研究问题 "+question["id"].replace("Q-","")
+    suggested=question.get("recommended_choice_id")
+    ordered=sorted(choices,key=lambda c: 0 if c["id"]==suggested else 1)
+    options=[]
+    for c in ordered:
+        native_label=c["label"]+(" (Recommended)" if c["id"]==suggested else "")
+        options.append({"label":native_label,"description":c["description"][:200]})
     return {"questions":[{
         "id":question["id"].lower().replace("-","_"),
         "header":header[:12],
         "question":question["text"],
-        "options":[{"label":c["label"],"description":c["description"][:200]}
-                   for c in choices],
+        "options":options,
     }]}
 
 def text_prompt(question):
@@ -116,6 +121,11 @@ def resolve_codex_answer(question, response):
         raise ResearchError("expected exactly one native answer")
     raw=selected[0]
     mapping={c["label"]:c["id"] for c in display_choices(question)}
+    recommended=question.get("recommended_choice_id")
+    if recommended is not None:
+        recommended_label=next(c["label"] for c in display_choices(question)
+                               if c["id"]==recommended)
+        mapping[recommended_label+" (Recommended)"]=recommended
     if raw in mapping:
         if item.get("other"):raise ResearchError("unexpected Other alongside a selected choice")
         return {"choice_id":mapping[raw],"custom_answer":None}
