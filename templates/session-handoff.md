@@ -12,3 +12,10 @@
 - 阻塞/归档的方案：`<IDs + reasons>`
 - 下一步工具命令/动作：`<command>`
 - 离线看板：`research/dashboard/index.html`
+
+## v0.4.1 Grilling 访谈恢复补充
+
+- 持久访谈状态路径：`research/interviews/current.json`（如尚未显式开始则不存在）
+- 访谈 ID、状态、修订、待回答问题：用 `python scripts/interview.py PROJECT_ROOT handoff` **只读**取得，不复制整个聊天记录。
+- 新的 Codex Session 必须显式调用 Research Navigator 或依赖用户主动安装的项目 `AGENTS.md` 引导；不会自动继承原会话的 Skill 激活。
+- 若状态是 `completed`：普通科研对话继续，不自动恢复密集 Grilling。
