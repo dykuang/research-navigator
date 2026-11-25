@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — v0.4.2 Interactive Grilling Choices
+
+- Typed question choices with stable IDs, per-question free-form Other and legacy interview schema support.
+- Strict native Codex request_user_input preview, response-to-ID resolver and explicit text fallback for unsupported clients/modes or larger choices.
+- Offline interview Canvas radios and custom draft (no writeback or automatic confirmation).
+- Linux/Windows/Chromium and synthetic multiround regression workflow; no stable tag or Release yet.
+
+
 ## Unreleased — v0.4.1 Persistent Research Grilling
 
 - Added durable interview sidecar and question frontier DAG with confirmation, deferral, revision propagation and explicit consensus exit.
