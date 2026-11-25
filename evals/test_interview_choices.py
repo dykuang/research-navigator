@@ -10,6 +10,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
 from rn_core import init_project,load,ResearchError
 from rn_interview import start,add_questions,answer,read,frontier,request_exit,confirm_exit,pause,resume,handoff
 from rn_interview_choices import (validate_choices,answer_fields,codex_request,
+                                  codex_async_request,resolve_async_reply,
                                   resolve_codex_answer,text_prompt)
 from build_canvas import build_canvas
 
@@ -158,6 +159,28 @@ class ChoiceTests(unittest.TestCase):
         self.assertEqual(selected,{"choice_id":"accuracy","custom_answer":None})
         other=resolve_codex_answer(x,{"answers":{"q_0001":{"selected":["Other"],"other":"不一样的研究方向"}}})
         self.assertEqual(other,{"choice_id":"other","custom_answer":"不一样的研究方向"})
+    def test_default_mode_async_payload_and_later_user_reply(self):
+        item=self.add()
+        packet=codex_async_request(item)
+        self.assertEqual(packet["questions"][0]["options"][0],"提高精度")
+        self.assertNotIn("Other",packet["questions"][0]["options"])
+        self.assertEqual(resolve_async_reply(item,"降低成本"),
+                         {"choice_id":"cost","custom_answer":None})
+        self.assertEqual(resolve_async_reply(item,"新的科研目标"),
+                         {"choice_id":"other","custom_answer":"新的科研目标"})
+        self.assertEqual(read(self.root)["questions"][0]["status"],"pending")
+    def test_async_ack_is_not_user_confirmation(self):
+        self.add()
+        argv=[sys.executable,str(Path(__file__).resolve().parents[1]/"scripts"/"interview.py"),
+              str(self.root)]
+        before=read(self.root)["revision"]
+        result=subprocess.run(argv+["async-request","--question","Q-0001"],
+                              capture_output=True,text=True,check=True)
+        d=json.loads(result.stdout)
+        self.assertEqual(d["tool_name"],"request_user_input_async")
+        self.assertTrue(d["async_ack_is_not_user_answer"])
+        self.assertFalse(d["tool_called"])
+        self.assertEqual(read(self.root)["revision"],before)
     def test_native_ambiguous_values_refused(self):
         x=self.add()
         bad=[
