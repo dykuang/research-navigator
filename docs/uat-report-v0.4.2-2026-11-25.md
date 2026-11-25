@@ -37,3 +37,9 @@ Dedicated `evals/uat_v042_multiround.py` validates all seven fictional rounds, a
 ## Cleanup and limitations
 
 No synthetic research project or generated dashboard is committed. Reusable fixtures/test scripts and this report are committed intentionally. Browser UI is an offline draft tool; it cannot submit answers. Real Codex `request_user_input` or `request_user_input_async` rendering depends on the user's mode, client version, and tool availability; printed JSON is **not** proof of a native picker.
+
+## Modal unavailable/failure protection — final additional UAT
+
+Added Issue [#56](https://github.com/dykuang/research-navigator/issues/56) to guarantee the **ordinary chat** fallback if Codex native question UI is missing, errors, is cancelled/timed out, or does not return an actual user answer. `interview.py ROOT present --question Q-ID` always supplies a complete `fallback_text` containing listed choices, `其他／自定义` and `补充说明（可选）`. Native candidates are only generated with explicitly declared runtime capability; CLI does not itself invoke a popup. Sync/async tool failures and async delivery acknowledgement are not user confirmations.
+
+Supplementary explanations via `answer --choice ID --supplement '...'` and `answer --choice other --custom-answer '...' --supplement '...'` are stored separately from the selected option / Other original text, appear in handoff and are cleared for invalidated downstream questions. Offline Canvas offers an additional input even with a preset choice; it only creates an **unsaved** draft. Regression includes missing tool, error, timeout, cancellation, no answer, >3 options, legacy questions, async acknowledgement, cross-session supplement retention, and browser UI. User-visible native Codex on the owner's machine is not proven by CI.
