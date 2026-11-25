@@ -5,7 +5,8 @@ import json
 import sys
 
 from rn_core import ResearchError, paths
-from rn_interview_choices import codex_request, text_prompt, resolve_codex_answer
+from rn_interview_choices import (codex_request,codex_async_request,text_prompt,
+                                  resolve_codex_answer,resolve_async_reply)
 from rn_interview import (start,read,add_questions,answer,pause,resume,request_exit,
                           reject_exit,confirm_exit,abandon,reopen,frontier,handoff)
 
@@ -13,7 +14,7 @@ def main():
     p=argparse.ArgumentParser(description="Persistent, explicit v0.4.1 research grilling interview")
     p.add_argument("root",help="Existing initialized research project ROOT")
     sub=p.add_subparsers(dest="command",required=True)
-    for cmd in ("start","status","add-questions","answer","next","prompt","native-request","resolve-native","pause","resume",
+    for cmd in ("start","status","add-questions","answer","next","prompt","native-request","resolve-native","async-request","resolve-async","pause","resume",
                 "request-exit","reject-exit","confirm-exit","abandon","reopen","handoff"):
         sp=sub.add_parser(cmd)
         if cmd=="start":
@@ -29,8 +30,9 @@ def main():
             sp.add_argument("--choice",help="Stable choice ID or other for free-form response")
             sp.add_argument("--custom-answer",help="Original user text; requires --choice other")
         if cmd=="next":sp.add_argument("--limit",type=int,default=5)
-        if cmd in ("prompt","native-request","resolve-native"):
+        if cmd in ("prompt","native-request","resolve-native","async-request","resolve-async"):
             sp.add_argument("--question",required=True)
+        if cmd=="resolve-async":sp.add_argument("--text",required=True)
         if cmd=="resolve-native":
             sp.add_argument("--response-json",required=True,
                             help="Native request_user_input return JSON, for inspection only")
@@ -62,7 +64,7 @@ def main():
                         revise=args.revise,choice_id=args.choice,
                         custom_answer=args.custom_answer,**common)
         elif c=="next":data=frontier(read(args.root),args.limit)
-        elif c in ("prompt","native-request","resolve-native"):
+        elif c in ("prompt","native-request","resolve-native","async-request","resolve-async"):
             document=read(args.root)
             questions={q["id"]:q for q in document["questions"]}
             selected=questions.get(args.question)
@@ -78,6 +80,17 @@ def main():
                       "must_check_runtime_capability":True,
                       "tool_called":False,
                       "other_is_client_supplied":True,
+                      "writeback":False}
+            elif c=="async-request":
+                data={"tool_name":"request_user_input_async",
+                      "tool_arguments":codex_async_request(selected),
+                      "must_check_runtime_capability":True,"tool_called":False,
+                      "async_ack_is_not_user_answer":True,
+                      "writeback":False}
+            elif c=="resolve-async":
+                data={"resolved":resolve_async_reply(selected,args.text),
+                      "requires_explicit_user_confirmation":True,
+                      "source":"subsequent-user-message-not-async-tool-ack",
                       "writeback":False}
             else:
                 data={"resolved":resolve_codex_answer(selected,json.loads(args.response_json)),
