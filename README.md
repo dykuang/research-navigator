@@ -131,3 +131,9 @@ v0.4.2 在 v0.4.1 的持久访谈上添加结构化回答选项、任何题目�
 
 
 Codex 的部分默认模式还提供非阻塞 `request_user_input_async`，需要单独格式 `title + options`。工具的 `accepted=true` 只表示请求送达，不是用户回答。详见 [v0.4.2 指南](references/interview-v042.md)；界面实际呈现必须在用户的客户端验收。
+
+### v0.4.2 弹窗失败保障与自由补充说明
+
+如果 Codex 当前模式没有原生问题弹窗，或者调用失败／取消／无法获得实际回答，Research Navigator 会改用普通聊天提问（A/B/C + **其他／自定义输入** + **补充说明（可选）**）。使用 `scripts/interview.py PROJECT_ROOT present --question Q-0001` 查看完整普通问答；只有实际客户端支持时才用 `--capability sync|async` 构造原生请求参数。如果原生交互失败，增加 `--failure unavailable|error|timeout|cancelled|no-answer` 获得降级文本。代码不会替客户端弹窗或伪装人类确认。
+
+无论选择哪一项，都可附加 `answer --choice ID --supplement '补充想法'`；选择「其他」还可以提供 `--custom-answer`。自由补充会保存进访谈状态和跨会话交接，不会冒充正式科研证据。测试见 `evals/test_interview_choices.py` 和 `evals/browser_check_v042.py`。
