@@ -38,3 +38,11 @@ python scripts/build_dashboard.py C:\\Temp\\rn-synthetic
 ~~~
 
 这是**合成研究数据**，不代表真实学术论文或实验验证。离线画布只能移动和导出布局/提案草稿；如需受控科研变更，运行 `python scripts/local_editor.py serve PROJECT_ROOT` 并在交互终端逐条审查批准。Codex SessionRef 目前只支持会话 ID 关联、筛选和复制，不承诺自动打开会话。
+
+## v0.4.1 在一个或多个会话中持续 Grilling
+
+**同一对话中**：说「使用 research-navigator，在我的项目中启动持续科研 Grilling，逐轮追问直到我明确确认退出」，然后直接回答每一轮问题。Agent 应记录共识与待回答问题。
+
+**换一个完全独立的对话**：再次明确调用 `$research-navigator`，提供**同一项目根目录**，说「请读取持久访谈进度，不要重新从头问」。新对话不会天然继承此前的 Skill 上下文；存档让恢复成为可能，但不是自动激活。
+
+**退出**：Agent 先汇总已解决、未解决和需要进一步实验的事项并请求审核；你明确同意后才进入普通科研助手模式。完整命令见 `research-navigator/references/interview-v041.md`。
