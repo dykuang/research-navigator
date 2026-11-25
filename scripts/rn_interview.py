@@ -72,9 +72,14 @@ def _validate(doc, project):
         byid[q["id"]]=q
         if not isinstance(q.get("text"),str) or not 1<=len(q["text"].strip())<=MAX_QUESTION_TEXT:
             raise ResearchError("invalid question text")
-        for k in ("why","options","recommendation","lowest_cost_check"):
+        guidance_keys=("why","recommendation","lowest_cost_check")
+        if "choices" not in q: guidance_keys+=("options",)
+        for k in guidance_keys:
             if not isinstance(q.get(k),str) or not q[k].strip():
                 raise ResearchError("question missing guidance: "+k)
+        if "choices" in q and ("options" in q and
+                                (not isinstance(q["options"],str) or not q["options"].strip())):
+            raise ResearchError("legacy options summary must be nonempty when supplied")
         if "choices" in q:
             validate_choices(q["choices"], q.get("recommended_choice_id"))
         if "selected_option_id" in q:
@@ -196,7 +201,9 @@ def add_questions(root,questions,*,actor="agent",expected_revision=None):
             dependencies=data.get("depends_on",[])
             if not isinstance(dependencies,list) or any(d not in ids for d in dependencies):
                 raise ResearchError("新问题依赖必须引用已有的前置问题")
-            for k in ("text","why","options","recommendation","lowest_cost_check"):
+            required=("text","why","recommendation","lowest_cost_check")
+            if "choices" not in data: required+=("options",)
+            for k in required:
                 if not isinstance(data.get(k),str) or not data[k].strip():
                     raise ResearchError("missing question guidance: "+k)
             if len(data["text"])>MAX_QUESTION_TEXT:
@@ -209,7 +216,8 @@ def add_questions(root,questions,*,actor="agent",expected_revision=None):
             elif "recommended_choice_id" in data:
                 raise ResearchError("recommended choice requires structured choices")
             q={"id":qid,"text":data["text"].strip(),"why":data["why"].strip(),
-               "options":data["options"].strip(),
+               "options":(data.get("options") or
+                          "；".join(c["label"] for c in data["choices"])).strip(),
                **({"choices":copy.deepcopy(data["choices"]),
                    "recommended_choice_id":data.get("recommended_choice_id")}
                   if "choices" in data else {}),
