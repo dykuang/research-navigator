@@ -6,7 +6,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
 from rn_core import init_project,load,ResearchError
 from rn_interview import (start,read,add_questions,answer,frontier,pause,resume,
                           request_exit,reject_exit,confirm_exit,handoff)
-from rn_interview_choices import (codex_request,resolve_codex_answer,text_prompt)
+from rn_interview_choices import (codex_request,resolve_codex_answer,text_prompt,delivery_plan)
 from build_canvas import build_canvas
 
 def q(title,depends=None):
@@ -37,6 +37,12 @@ def main():
         add_questions(root,[q("Which outcome is worth optimizing?")])
         first=frontier(read(root))["ready"][0]
         assert "其他／自定义" in text_prompt(first)
+        # Simulate a runtime without the UI and a failed sync modal.
+        no_modal=delivery_plan(first,capability="none")
+        assert no_modal["mode"]=="chat" and "补充说明" in no_modal["fallback_text"]
+        failed_modal=delivery_plan(first,capability="sync",failure="error")
+        assert failed_modal["mode"]=="chat" and "其他／自定义" in failed_modal["fallback_text"]
+        assert not failed_modal["native_tool_called"]
         request=codex_request(first)
         assert len(request["questions"][0]["options"])==2
         # Round 2 - Student chooses Other; no forced A/B answer.
@@ -49,11 +55,13 @@ def main():
         add_questions(root,[q("How should we evaluate robustness?",["Q-0001"])])
         second=frontier(read(root))["ready"][0]
         option=resolve_codex_answer(second,{"answers":{"q_0002":{"answers":["Improve accuracy"]}}})
-        answer(root,"Q-0002",choice_id=option["choice_id"])
+        answer(root,"Q-0002",choice_id=option["choice_id"],
+               supplement="Include cost and robustness constraints")
         # Round 4 - Interrupt and resume from persistent file.
         pause(root)
         h=handoff(root)
         assert h["confirmed"][0]["answer"]=="Measure robustness under shift"
+        assert h["confirmed"][1]["supplement"]=="Include cost and robustness constraints"
         resume(root)
         # Round 5 - Change first answer -> invalidate dependent confirmation.
         answer(root,"Q-0001",choice_id="accuracy",revise=True)
