@@ -12,6 +12,7 @@ from rn_interview import (start,read,add_questions,answer,frontier,pause,resume,
                           handoff,interview_path)
 from build_interview import build as build_interview
 from build_canvas import build_canvas
+from install_interview_guidance import install as install_guidance, START as AGENTS_START
 
 def question(text="Define useful improvement",depends_on=None):
     return {"text":text,
@@ -178,5 +179,25 @@ class InterviewLifecycleTests(unittest.TestCase):
         self.begin();add_questions(self.root,[question()])
         answer(self.root,"Q-0001","Claim: F1 2 points better")
         self.assertEqual(load(self.root)["items"],[])
+
+    def test_agents_md_opt_in_does_not_overwrite(self):
+        self.begin()
+        file=self.root/"AGENTS.md"
+        file.write_text("# Existing rules\nKeep unrelated instructions.\n",encoding="utf-8")
+        before=file.read_text(encoding="utf-8")
+        preview=install_guidance(self.root)
+        self.assertFalse(preview["applied"])
+        self.assertEqual(file.read_text(encoding="utf-8"),before)
+        installed=install_guidance(self.root,apply=True)
+        self.assertTrue(installed["applied"])
+        updated=file.read_text(encoding="utf-8")
+        self.assertTrue(updated.startswith(before.rstrip()))
+        self.assertIn(AGENTS_START,updated)
+        with self.assertRaises(ResearchError):install_guidance(self.root,apply=True)
+        self.assertEqual(file.read_text(encoding="utf-8"),updated)
+    def test_agents_md_no_implicit_project_initialization(self):
+        other=Path(self.tmp.name)/"no-such-research"
+        with self.assertRaises(ResearchError):install_guidance(other,apply=True)
+        self.assertFalse((other/"AGENTS.md").exists())
 
 if __name__=="__main__": unittest.main()
