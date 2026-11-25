@@ -100,6 +100,13 @@ const custom=document.createElement("textarea");custom.className="other-input";
 custom.placeholder="请输入你自己的研究目标、原因或备选方案";
 custom.setAttribute("aria-label",x.id+" 自定义答案");
 custom.hidden=true;c.appendChild(custom);
+const supplementLabel=document.createElement("label");
+t(supplementLabel,"strong","补充说明（可选）");
+const supplement=document.createElement("textarea");
+supplement.className="other-input";
+supplement.placeholder="可在选择任何预设项后补充原因、限制或其他设想";
+supplement.setAttribute("aria-label",x.id+" 补充说明");
+supplementLabel.appendChild(supplement);c.appendChild(supplementLabel);
 const draft=document.createElement("pre");draft.className="card draft";
 draft.hidden=true;c.appendChild(draft);
 const generate=document.createElement("button");generate.type="button";
@@ -113,6 +120,7 @@ function refresh(){
 }
 all.forEach(input=>input.addEventListener("change",refresh));
 custom.addEventListener("input",refresh);
+supplement.addEventListener("input",refresh);
 generate.addEventListener("click",()=>{
  const selected=all.find(el=>el.checked);
  if(!selected||generate.disabled)return;
@@ -120,7 +128,9 @@ generate.addEventListener("click",()=>{
  const content=selected.value==="other"?
    x.id+" 其他／自定义："+custom.value.trim():
    x.id+" 选择："+item.id+"（"+item.label+"）";
- draft.textContent=content+"\\n请将这段内容粘贴到 Codex 会话，由 Agent 确认后保存。";
+ const extra=supplement.value.trim();
+ draft.textContent=content+(extra?"\\n补充说明："+extra:"")+
+  "\\n请将这段内容粘贴到 Codex 会话，由 Agent 确认后保存。";
  draft.hidden=false;
 });
 });
