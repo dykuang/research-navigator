@@ -122,3 +122,18 @@ v0.4.0 在已有 v0.3 科学推理图上新增只读决策辅助，正式发布�
 **最简单的使用方式：** 已安装 Skill 的 Codex 中明确说「在这个研究项目使用 research-navigator 开始 Grilling，多轮追问直到我确认结束；下次继续之前读取 `interview.py status/next`」。若更换全新对话，会再次显式引用 Skill；**记录持久不代表 Skill 永远自动激活**。
 
 v0.4.1 的 Agent 长会话行为与用户 Windows/Codex 环境仍需要人工验收，CLI 的 `--actor user` 不是身份认证。Release 发布以 GitHub 上正式 tag 为准，开发分支不代表稳定版本。
+
+## v0.4.2 · Interactive Grilling Choices（开发中）
+
+v0.4.2 在 v0.4.1 的持久访谈上添加结构化回答选项、任何题目都允许的 Other 自定义答案、Codex 原生 `request_user_input` 参数预览（**必须检查运行时实际支持**）和文字降级方案、离线 Canvas 单选/自定义输入草案。原有字符串选项与 `answer --text` 均保留兼容；被用户更改的答案会重新标记相关下游问题。详见 [v0.4.2 交互问答说明](references/interview-v042.md)。
+
+这不是 v0.4.2 正式发布声明。Codex 客户端原生提问界面依赖当前模式；仅生成 JSON 请求不等于实际显示。HTML 也不执行真实回答写入或科研批准。
+
+
+Codex 的部分默认模式还提供非阻塞 `request_user_input_async`，需要单独格式 `title + options`。工具的 `accepted=true` 只表示请求送达，不是用户回答。详见 [v0.4.2 指南](references/interview-v042.md)；界面实际呈现必须在用户的客户端验收。
+
+### v0.4.2 弹窗失败保障与自由补充说明
+
+如果 Codex 当前模式没有原生问题弹窗，或者调用失败／取消／无法获得实际回答，Research Navigator 会改用普通聊天提问（A/B/C + **其他／自定义输入** + **补充说明（可选）**）。使用 `scripts/interview.py PROJECT_ROOT present --question Q-0001` 查看完整普通问答；只有实际客户端支持时才用 `--capability sync|async` 构造原生请求参数。如果原生交互失败，增加 `--failure unavailable|error|timeout|cancelled|no-answer` 获得降级文本。代码不会替客户端弹窗或伪装人类确认。
+
+无论选择哪一项，都可附加 `answer --choice ID --supplement '补充想法'`；选择「其他」还可以提供 `--custom-answer`。自由补充会保存进访谈状态和跨会话交接，不会冒充正式科研证据。测试见 `evals/test_interview_choices.py` 和 `evals/browser_check_v042.py`。

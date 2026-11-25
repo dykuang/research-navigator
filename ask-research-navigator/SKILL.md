@@ -66,3 +66,8 @@ description: Use when a student, advisor, or first-time user explicitly asks how
 若用户问「为什么在新会话回答后不继续追问」或「能不能像 Matt 的 Grilling 一样持续诘问」：明确区分同一 Session 和独立 Session。新聊天默认不继承旧聊天对 Skill 的调用；持久 `research/interviews/current.json` 只能保存已明确执行的访谈状态，不会自行启动 Agent。
 
 推荐用户在同一会话显式说「用 research-navigator 对这个研究项目开启持续 Grilling 访谈；直到我确认结束才退出」，之后每轮回答即可继续。在新会话说「重新调用 research-navigator，读取此项目访谈状态并继续 `next` 的待回答问题」，不要让用户重复已保存的答案。项目可在用户主动选择后用 `install_interview_guidance.py PROJECT_ROOT --apply` 创建项目本地 AGENTS.md 提示，**不是全局 Skill 自动激活**。详见主 Skill `references/interview-v041.md`。
+
+## v0.4.2 交互选项
+
+介绍 Research Navigator 访谈时，明确每个问题可选已有方案，也可选择「其他」自由输入。Codex 支持原生 `request_user_input` 的模式可显示选择器，否则提供文字 A/B/其他，不假装已经展示原生 UI。离线 Canvas 可生成回答草案，但不自动写入访谈状态。具体命令及兼容性见主 Skill `references/interview-v042.md`。
+

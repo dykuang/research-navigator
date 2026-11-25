@@ -41,3 +41,16 @@ This protocol applies **while** `research/interviews/current.json` reports `acti
 6. Exit only via `request-exit` → review summary with user → `confirm-exit` by user/mentor, naming each accepted open issue. If they disagree, `reject-exit` and continue. On `completed`, normal assistant mode resumes; restart only by explicit `reopen` or a new interview after archiving the old record.
 
 Cross-session handoff: use `scripts/interview.py PROJECT_ROOT handoff` (read-only) and pass the actual project location in the new session. This restores research interview state, not the prior chat text or implicit Skill activation. See `references/interview-v041.md`.
+
+## v0.4.2 Question UX contract
+
+Every high-value Grilling question must allow user-generated alternatives or a direct answer. Prefer 2–3 structured choices and a reasoned default, but always explain the Other/free-form route. Do not infer agreement because a recommended item was shown.
+
+If an actual Codex `request_user_input` tool is available to this Agent in its current mode, call that real tool only with its documented 2–3 options per question and wait for the response; the native Codex UI supplies Other. The `native-request` CLI emits *only a preview JSON*, and must never be described as an actual popup. With no tool, a legacy question, or more than 3 choices, show a text fallback with all alternatives and explicit Other. Resolve the response to a stable option ID or exact custom text, ask for confirmation, and persist using `interview.py answer`. Preserve original answers and never convert a suggestion into scientific evidence.
+
+
+## v0.4.2 Native picker failure → guaranteed chat fallback (#56)
+
+For each interview question, construct a complete text fallback **before** attempting any native Codex UI. It lists every available choice, an **Other / custom free-text route**, and an **optional supplementary explanation even when the user selects a preset choice**. Run `interview.py ROOT present --question Q-0001` for a complete default chat rendering; with verified native capability use `--capability sync` or `--capability async` to preview a native candidate and a fallback together. The CLI never invokes Codex UI by itself.
+
+If the runtime tool is missing, blocked, errors, times out, is cancelled, displays nothing, or yields no usable user reply, immediately ask the full text question in normal conversation (via `present --failure unavailable|error|timeout|cancelled|no-answer`). Async `accepted=true` is **delivery acknowledgement only**: await an actual user message; after a failed attempt, use text fallback. Do not advance dependent questions without actual user-confirmed answers. Capture extra user reasoning alongside any preset choice via `--supplement`, or custom text for Other via `--custom-answer`; store both with audit/handoff. Never claim success of an unavailable native tool.

@@ -44,6 +44,16 @@ description: Use when a student or advisor wants to initiate, scope, investigate
 
 按需参考 `references/interview-v041.md`、`references/interaction-protocol.md`；新用户帮助由 `ask-research-navigator` 提供。项目本地可选的 AGENTS.md 引导仅在用户明确执行 `python scripts/install_interview_guidance.py PROJECT_ROOT --apply` 后写入，不自动修改全局 Agent 行为。
 
+
+## v0.4.2 · 结构化问答、Other 自由输入和 Codex 原生交互降级
+
+Grilling 每道题必须允许用户拒绝已有备选项并给出**其他／自定义**答案；不要把推荐选项当作自动确认结果。建议创建 `choices`（稳定 ID、显示标签、利弊说明）和可选 `recommended_choice_id`，优先 2–3 项；旧版仅含 `options` 字符串的问题继续支持完整自由回答。详见 `references/interview-v042.md`。
+
+在 Codex 运行时**实际提供** `request_user_input` 工具的模式中，可以优先调用真实工具，以 1–3 个问题和每题 2–3 个选项展示原生选择器。**不得手工插入 Other 到 native options**：支持的客户端自行添加输入框。调用前可用 `python scripts/interview.py PROJECT_ROOT native-request --question Q-0001` 获得只读建议参数，但该 CLI **没有**真正显示 UI，返回 `tool_called=false`。检查工具实际可用性，不支持时改用 `prompt --question Q-0001` 文本展示 A/B/C/其他。四个以上选项也须完整文本展示，不能静默截断。
+
+用户选定固定项后，在实际确认基础上使用 `answer --question Q-0001 --choice CHOICE_ID --actor user`；用户选 Other 时用 `--choice other --custom-answer '用户原话'`；旧版 `--text` 仍可使用。Codex 原生回包可以先用 `resolve-native --response-json` 只读解释，未知选项应追问，不能静默写入状态。受影响下游问题仍必须在 `--revise` 后重新确认。离线 HTML 提供选项控件但只能生成可复制的回答草案，**不保存、不代替授权**。
+
+
 ## 先做什么
 
 1. 找到用户指定的**科研项目根目录**（不是本 Skill 安装目录）。检查 `RESEARCH.md`、`CONTEXT.md`、`research/state/`、现有研究记录、Git 状态；现有内容优先，不得无故覆盖。
@@ -137,3 +147,14 @@ python scripts/build_dashboard.py /PROJECT/ROOT
 当用户询问“下一步做什么、证据不足在哪里、哪条实验最有信息价值、导师需要审核什么”时，优先运行 `python scripts/v04_project.py PROJECT_ROOT brief` 或 `gaps / opportunities / archive`。按需参考 `references/decision-v04.md`，不必开始新项目或回到初始访谈。报告读取 v0.3 权威状态，不写入项目状态、批准实验或解除归档隔离。**任何建议只是用于讨论的假设；信息价值和成本默认为未知，无法用虚构概率/评分替代证据。**
 
 无限画布离线导出后，打开 `research/canvas/decisions.html` 查看证据缺口、低成本区分性检查、导师审查和历史路线复审。画布的科学语义编辑仍需 v0.2 本机提案 → 人工终端批准；不得让代理把离线建议伪装成通过审批的待执行任务。
+
+**默认模式的异步交互补充（v0.4.2）：**部分 Codex 客户端仅提供 `request_user_input_async`，参数为 `questions:[{title,options:[文字选项]}]`，可以从 `interview.py PROJECT_ROOT async-request --question Q-0001` 生成**只读**建议。该工具返回的 `{"accepted":true}` **只表示发送请求成功，不表示用户选择或授权**。Agent 必须等待实际的新用户消息，并在确认后记录；必要时用 `resolve-async --question Q-0001 --text '用户原话'` 将回答解释为固定选项或 Other。异步卡片未显示、被关闭或无法取得回答时，立即提供明确文本选项降级。不得在仅收到 accepted 时推进依赖问题。
+
+
+### v0.4.2 必须执行的弹窗失败降级协议（#56）
+
+每次提问前可用 `python scripts/interview.py PROJECT_ROOT present --question Q-0001` 得到**直接可用的普通聊天问题**（全部备选项 + **其他／自定义** + **补充说明（可选）**）。只有确认当前运行时实际暴露工具，才将 `--capability sync` 或 `--capability async` 传给 `present` 并尝试真正的 Codex 原生工具调用。CLI 不会自己弹窗、也不会声称弹窗已显示。
+
+**强制兜底：**如果工具不存在、禁用、调用报错、取消、超时、或者用户没有看到选择界面／没有交回可解析答案，**立刻在当前对话内用** `present --question Q-0001 --capability sync --failure error`（将实际原因换为 `unavailable/error/timeout/cancelled/no-answer`）的 `fallback_text` 向用户普通提问。不能只发 JSON、不能等待虚构的弹窗成功、不能自动选择默认项、不能因异步工具 `accepted=true` 而跳过提问或提前确认。
+
+选预设项时用户仍可以补充自己的条件／理由／新观点，用 `answer --question Q-0001 --choice ID --supplement '补充原话'` 保存；选“其他”用 `--choice other --custom-answer '自定义答案' --supplement '可选说明'`。**选项补充内容和自定义答案都要经用户实际确认**，不能转化成科学证据。新会话恢复 `handoff` 应同时带回 selected ID、自定义和 supplement。离线 HTML 仅生成草案，不会写回。
