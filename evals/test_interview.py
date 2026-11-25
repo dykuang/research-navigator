@@ -98,6 +98,9 @@ class InterviewLifecycleTests(unittest.TestCase):
         with self.assertRaises(ResearchError):confirm_exit(self.root,[])
         confirmed=confirm_exit(self.root,["Q-0002"])
         self.assertEqual(confirmed["accepted_open_questions"],["Q-0002"])
+        self.assertEqual(frontier(confirmed)["ready"],[])
+        self.assertEqual(frontier(confirmed)["accepted_open_questions"],["Q-0002"])
+        self.assertFalse(frontier(confirmed)["requires_explicit_exit_confirmation"])
     def test_revise_invalidates_dependent_confirmation(self):
         self.begin();add_questions(self.root,[question("What dataset?")])
         add_questions(self.root,[question("Metric",["Q-0001"])])
