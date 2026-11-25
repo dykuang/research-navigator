@@ -118,6 +118,8 @@ def resolve_async_reply(question,text):
         raise ResearchError("empty or oversized async reply")
     value=text.strip()
     choices=display_choices(question)
+    if not choices:
+        return {"choice_id":None,"custom_answer":None,"answer_text":value}
     matches=[c for c in choices if c["label"]==value]
     if len(matches)>1:raise ResearchError("ambiguous async choice")
     if matches:
