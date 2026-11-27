@@ -132,6 +132,26 @@ def main():
                 page.locator("#refreshSemantic").click()
                 assert read_context(root)["links"]==[]
                 assert load(root)==original
+                # Link a provider-specific SessionRef to the Grilling question.
+                page.locator('[data-output-node="session:'+session["id"]+'"]').click()
+                page.locator('[data-input-node="'+source+'"]').click()
+                params=json.loads(page.locator("#semanticParams").input_value())
+                assert params["relation"]=="discussed-in-session"
+                assert params["from"]=="session:"+session["id"]
+                page.locator("#previewSemantic").click()
+                expect(page.locator("#queueSemantic")).to_be_enabled()
+                page.locator("#queueSemantic").click()
+                expect(page.locator("#semanticState")).to_contain_text("待终端审批")
+                pending=[p for p in (root/"research"/"canvas"/"proposals").glob("*.json")
+                         if json.loads(p.read_text(encoding="utf-8"))["status"]=="pending"]
+                assert len(pending)==1
+                approve_proposal(root,pending[0].stem,confirmed=True)
+                page.locator("#refreshSemantic").click()
+                page.locator('[data-node="'+source+'"]').click()
+                page.locator("#sessionProviderFilter").select_option("deepseek")
+                expect(page.locator("#sessionRecords")).to_contain_text("deepseek")
+                page.locator("#sessionProviderFilter").select_option("")
+                assert load(root)==original
                 # Narrow viewport keeps inspector accessible.
                 page.set_viewport_size({"width":385,"height":800})
                 page.locator("#mobileInspectorToggle").click()
