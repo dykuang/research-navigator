@@ -90,6 +90,7 @@ def main():
                 expect(editor.locator("pre")).to_contain_text("Optional boundary condition")
                 assert read(root)==before_interview
                 page.locator("#sessionProviderFilter").select_option("deepseek")
+                page.locator('[data-node="item:'+idea["id"]+'"]').click()
                 expect(page.locator("#sessionRecords")).to_contain_text("deepseek")
                 page.locator("#sessionProviderFilter").select_option("")
                 page.locator("#search").fill("Scientific Milestone".lower())
