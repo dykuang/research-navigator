@@ -19,6 +19,8 @@ def main():
   session_entity_link(root,s1["id"],idea["id"],"idea-origin")
   session_entity_link(root,s1["id"],claim["id"],"decision")
   session_entity_link(root,s2["id"],idea["id"],"experiment-analysis")
+  s3=create_session(root,"deepseek","workspace-green","dsh-session-ghi")
+  session_entity_link(root,s3["id"],idea["id"],"discussion")
   before=load(root)
   server=ThreadingHTTPServer(("127.0.0.1",0),object)
   port=server.server_address[1]; token="test-session-ui-only"
@@ -36,7 +38,10 @@ def main():
     expect(page.locator("#sessionRecords")).to_contain_text("idea-origin")
     expect(page.locator("#sessionRecords")).to_contain_text("experiment-analysis")
     expect(page.locator("#sessionRecords")).to_contain_text("未验证的 provider 深链接")
-    assert page.locator("#sessionRecords button").count()==2
+    assert page.locator("#sessionRecords button").count()==3
+    page.locator("#sessionProviderFilter").select_option("deepseek")
+    expect(page.locator("#sessionRecords")).to_contain_text("dsh-session-ghi")
+    expect(page.locator("#sessionRecords")).not_to_contain_text("codex-session-abc")
     page.locator("#sessionProviderFilter").select_option("codex")
     expect(page.locator("#sessionRecords")).not_to_contain_text("chatgpt-session-def")
     page.locator("#sessionWorkspaceFilter").fill("workspace-red")

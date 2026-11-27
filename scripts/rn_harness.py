@@ -51,6 +51,10 @@ def resolve_deepseek(question, response):
         return {"status": "pending", "resolved": None}
     if response.get("accepted") is True:
         raise ResearchError("delivery acknowledgement is not an answer")
+    if set(response) != {"answers"}:
+        raise ResearchError("unsupported DSH response envelope")
+    if plan(question, "deepseek", "ask-user")["mode"] != "native-candidate":
+        raise ResearchError("question is not eligible for DSH native choices")
     rows = response.get("answers")
     if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
         raise ResearchError("expected exactly one DSH answer")
@@ -69,9 +73,6 @@ def resolve_deepseek(question, response):
         return {"status": "candidate", "resolved": {"choice_id": "other", "custom_answer": custom}}
     if custom:
         raise ResearchError("ambiguous selection with custom text; clarify supplement")
-    preview = plan(question, "deepseek", "ask-user")
-    if preview["mode"] != "native-candidate":
-        raise ResearchError("question is not eligible for DSH native choices")
     choices = display_choices(question)
     recommended = question.get("recommended_choice_id")
     mapping = {c["label"] + (" (Recommended)" if c["id"] == recommended else ""): c["id"]

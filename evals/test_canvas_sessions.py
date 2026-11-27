@@ -27,7 +27,7 @@ class SessionCanvasTests(unittest.TestCase):
  def test_many_to_many_ids_roles_and_unlink(self):
   a=self.commit("register-session",{"provider":"codex","workspace_id":"proj-A",
                                      "session_id":"real-session-a"})
-  b=self.commit("register-session",{"provider":"other","workspace_id":"proj-A",
+  b=self.commit("register-session",{"provider":"deepseek","workspace_id":"proj-A",
                                      "session_id":"real-session-b"})
   self.assertNotEqual(a["id"],b["id"])
   for ref,entity,role in ((a,self.idea,"idea-origin"),(a,self.claim,"decision"),

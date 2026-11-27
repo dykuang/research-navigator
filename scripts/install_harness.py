@@ -149,21 +149,30 @@ def operate(root, action, apply=False, source=None):
         else:
             # Rename only verified bundles into a private staging directory.
             # If either move fails, restore earlier moves; never delete user edits.
-            with tempfile.TemporaryDirectory(prefix=".rn-remove-",dir=root) as tmp:
-                stage=Path(tmp)
-                moved=[]
-                try:
-                    for name in NAMES:
-                        dest=root/name
-                        if not _owned(dest,name):
-                            raise ValueError("skill changed during uninstall")
-                        dest.rename(stage/name)
-                        moved.append(name)
-                except Exception:
-                    for name in reversed(moved):
-                        if not (root/name).exists():
-                            (stage/name).rename(root/name)
-                    raise
+            stage=Path(tempfile.mkdtemp(prefix=".rn-remove-",dir=root))
+            moved=[]
+            try:
+                for name in NAMES:
+                    dest=root/name
+                    if not _owned(dest,name):
+                        raise ValueError("skill changed during uninstall")
+                    dest.rename(stage/name)
+                    moved.append(name)
+                if not all(_owned(stage/n,n) for n in moved):
+                    raise ValueError("staged skill changed during uninstall")
+            except Exception:
+                for name in reversed(moved):
+                    dest=root/name
+                    if not dest.exists() and not dest.is_symlink():
+                        try:
+                            (stage/name).rename(dest)
+                        except OSError:
+                            pass
+                if any(stage.iterdir()):
+                    raise ValueError("uninstall interrupted; recover staged files at "+str(stage))
+                stage.rmdir()
+                raise
+            shutil.rmtree(stage)
         result.update(applied=True,skills=_inspect(root))
         return result
     finally:

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — v0.5 Multi-Harness
+
+- Pure Harness question preview/answer interpreter for Codex, DSH and text fallback.
+- Opt-in installer and filesystem doctor for both skills; no overwrite of existing bundles.
+- DeepSeek SessionRef provider, Canvas filtering and explicit shared-workspace interview handoff.
+- Synthetic tests for response semantics, installation, handoff and revision conflict; real client UAT pending.
+
+
 ## Unreleased — v0.4.2 Interactive Grilling Choices
 
 - Typed question choices with stable IDs, per-question free-form Other and legacy interview schema support.

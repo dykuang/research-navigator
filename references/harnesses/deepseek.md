@@ -1,6 +1,6 @@
 # DeepSeek Harness (v0.5 development)
 
-DSH is a developer-preview project. Activate the installed skill explicitly in the current session; discoverability does not establish that a tool or UI is exposed. Default documented filesystem roots: project .dsh/skills, project .agents/skills, user DSH_HOME/skills (default ~/.dsh/skills), user DSH_AGENTS_HOME/skills (default ~/.agents/skills). Use the nearest Git root. Custom presets may disable filesystem discovery. See https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/skill/skill-filesystem/README.md.
+DSH is a developer-preview project. Activate the installed skill explicitly in the current session; discoverability does not establish that a tool or UI is exposed. Default documented filesystem roots: project .dsh/skills, project .agents/skills, user DSH_HOME/skills (default ~/.dsh/skills), user DSH_AGENTS_HOME/skills (default ~/.agents/skills). Use the nearest Git root. Custom presets may disable filesystem discovery. See https://github.com/deepseek-ai/deepseek-harness/blob/4b399c39a6d1479cd84ca591b4d7c88e24d38a96/packages/skill/skill-filesystem/README.md.
 
 ## Install and inspect
 

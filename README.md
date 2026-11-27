@@ -137,3 +137,8 @@ Codex 的部分默认模式还提供非阻塞 `request_user_input_async`，需�
 如果 Codex 当前模式没有原生问题弹窗，或者调用失败／取消／无法获得实际回答，Research Navigator 会改用普通聊天提问（A/B/C + **其他／自定义输入** + **补充说明（可选）**）。使用 `scripts/interview.py PROJECT_ROOT present --question Q-0001` 查看完整普通问答；只有实际客户端支持时才用 `--capability sync|async` 构造原生请求参数。如果原生交互失败，增加 `--failure unavailable|error|timeout|cancelled|no-answer` 获得降级文本。代码不会替客户端弹窗或伪装人类确认。
 
 无论选择哪一项，都可附加 `answer --choice ID --supplement '补充想法'`；选择「其他」还可以提供 `--custom-answer`。自由补充会保存进访谈状态和跨会话交接，不会冒充正式科研证据。测试见 `evals/test_interview_choices.py` 和 `evals/browser_check_v042.py`。
+
+
+## v0.5 development — Multi-Harness Research Navigation
+
+The development branch adds a read-only DSH question adapter, opt-in two-skill installer/doctor, DeepSeek SessionRef, and explicit shared-project interview handoff. See [DSH guide](references/harnesses/deepseek.md) and [capability contract](references/harnesses/contract.md). Existing Codex flags are preserved. The source-level DSH schema is checked at upstream commit 4b399c39; real Web/Desktop/Windows activation remains unverified. No new scientific schema migration or automatic session discovery. Older software may reject new deepseek provider records. No release tag is claimed.
