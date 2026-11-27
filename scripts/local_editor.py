@@ -210,14 +210,15 @@ def create_handler(root, token, port):
                 except (ResearchError,ValueError,OSError) as exc:
                     self._send(409,{"error":str(exc)})
                 return
-            if self.path == "/canvas":
+            if self.path in ("/canvas","/unified"):
                 # Public shell contains NO project data. Only authenticated
                 # X-RN-Token /api/graph requests return project information.
                 if self.headers.get("Host") != allowed_host:
                     return self._send(403, {"error":"Invalid Host"})
                 if self.headers.get("Sec-Fetch-Site","same-origin") not in ("same-origin","none"):
                     return self._send(403, {"error":"Cross-site request forbidden"})
-                template = Path(__file__).resolve().parent.parent/"templates"/"research_canvas.html"
+                template_name = "unified_canvas.html" if self.path=="/unified" else "research_canvas.html"
+                template = Path(__file__).resolve().parent.parent/"templates"/template_name
                 nonce = secrets.token_urlsafe(18)
                 empty_graph = {"project_id":"","project_revision":0,"nodes":[],"edges":[]}
                 empty_views = {"schema_version":"canvas-views-v1","project_id":"","views":{}}
@@ -228,6 +229,15 @@ def create_handler(root, token, port):
                 raw = page.encode("utf-8")
                 self._headers(200,content_type="text/html",nonce=nonce)
                 self.wfile.write(raw)
+                return
+            if self.path == "/api/unified-graph":
+                if not self._guard():
+                    return
+                try:
+                    from unified_graph import unified_graph
+                    self._send(200,unified_graph(root))
+                except (ResearchError,ValueError,OSError,KeyError) as exc:
+                    self._send(409,{"error":str(exc)})
                 return
             if self.path == "/api/graph":
                 if not self._guard():
