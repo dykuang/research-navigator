@@ -77,6 +77,21 @@ def main():
                 page.locator("#view").select_option("interview")
                 assert page.locator('[data-node="'+source+'"]').is_visible()
                 page.locator("#view").select_option("all")
+                # Grilling cards are included in the SAME editor. Drafts never write.
+                before_interview=read(root)
+                page.locator('[data-node="'+source+'"]').click()
+                editor=page.locator("#details .interview-choices")
+                expect(editor).to_be_visible()
+                editor.get_by_role("radio",name=__import__("re").compile("其他")).check()
+                editor.locator('textarea[aria-label="Grilling 自定义答案"]').fill("Original alternative hypothesis")
+                editor.locator('textarea[aria-label="Grilling 补充说明"]').fill("Optional boundary condition")
+                editor.get_by_role("button",name="生成回答草案（不会保存）").click()
+                expect(editor.locator("pre")).to_contain_text("Original alternative hypothesis")
+                expect(editor.locator("pre")).to_contain_text("Optional boundary condition")
+                assert read(root)==before_interview
+                page.locator("#sessionProviderFilter").select_option("deepseek")
+                expect(page.locator("#sessionRecords")).to_contain_text("deepseek")
+                page.locator("#sessionProviderFilter").select_option("")
                 page.locator("#search").fill("Scientific Milestone".lower())
                 assert page.locator(".node").count()>=1
                 page.locator("#search").fill("")
