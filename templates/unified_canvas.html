@@ -739,7 +739,8 @@ function renderSessions(selectedId){
     (!provider||n.metadata.provider===provider)&&
     (!workspace||(n.metadata.workspace_id||"").toLocaleLowerCase().includes(workspace))&&
     (!selectedId||n.id===selectedId||allEdges.some(e=>
-      e.provenance.collection==="session_refs"&&e.from===n.id&&e.to===selectedId)));
+      (e.provenance.collection==="session_refs"||e.type==="discussed-in-session")&&
+      e.from===n.id&&e.to===selectedId)));
   if(!sessions.length){
     container.textContent="无匹配会话。可调整过滤或在右侧添加 SessionRef 提案。";return;
   }
@@ -747,7 +748,8 @@ function renderSessions(selectedId){
     const m=ref.metadata||{},box=document.createElement("div");
     box.className="warn info";box.style.margin="8px 0";
     const roles=allEdges.filter(e=>e.from===ref.id&&e.to===selectedId&&
-      e.provenance.collection==="session_refs").map(e=>e.type.replace(/^session:/,""));
+      (e.provenance.collection==="session_refs"||e.type==="discussed-in-session"))
+      .map(e=>e.type.replace(/^session:/,""));
     const title=document.createElement("strong");
     title.textContent=ref.entity_id+" · "+m.provider+" · "+(roles.join(", ")||"registered");
     box.appendChild(title);
