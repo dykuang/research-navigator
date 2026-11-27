@@ -237,6 +237,10 @@ class UnifiedGraphTests(unittest.TestCase):
         path.write_text("{not json",encoding="utf-8")
         original=load(self.root)
         with self.assertRaises(ResearchError):self.graph()
+        classic=build_canvas(self.root)
+        self.assertTrue(classic.exists())
+        self.assertIn("经典画布仍可使用",classic.read_text(encoding="utf-8"))
+        self.assertNotIn('href="unified.html"',classic.read_text(encoding="utf-8"))
         self.assertEqual(load(self.root),original)
 
 if __name__=="__main__":unittest.main()
