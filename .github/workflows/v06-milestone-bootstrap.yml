@@ -1,0 +1,30 @@
+name: Bootstrap v0.6 unified canvas milestone (temporary)
+on:
+  push:
+    branches: [feat/v0.6-unified-research-canvas]
+    paths:
+      - .github/workflows/v06-milestone-bootstrap.yml
+permissions:
+  contents: read
+  issues: write
+jobs:
+  create-milestone:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create or reuse native GitHub milestone
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: "v0.6.0 — Unified Research Canvas & Node Editor"
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing=$(gh api "repos/$GH_REPO/milestones?state=all&per_page=100" --jq '.[] | select(.title == env.TITLE) | .number' | head -n 1)
+          if [ -n "$existing" ]; then
+            echo "MILESTONE_NUMBER=$existing"
+          else
+            gh api --method POST "repos/$GH_REPO/milestones" \
+              -f title="$TITLE" \
+              -f description="Unify Grilling interview frontier, Claim-Evidence provenance, ResearchBranch routes, scientific Milestones, and Sessions in one Blender-style typed node editor. Reuse canonical state and human-reviewed proposal bridge; preserve offline read-only mode. Planned after v0.5 harness integration." \
+              --jq '"MILESTONE_NUMBER=" + (.number|tostring)'
+          fi
