@@ -44,13 +44,20 @@ def build_canvas(root):
     html=html.replace('<a href="../dashboard/index.html">返回经典工作台</a>',
                       ('<a href="interview.html">科研访谈</a> · ' if interview_page else '') +
                       '<a href="decisions.html">研究决策</a> · <a href="../dashboard/index.html">返回经典工作台</a>')
-    html=html.replace('<a href="../dashboard/index.html">返回经典工作台</a>',
-                      '<a href="unified.html">统一节点画布</a> · <a href="../dashboard/index.html">返回经典工作台</a>')
-    atomic_text(dest,html)
-    # Generate the unified graph as a separate view. v0.2 classic canvas remains
-    # unchanged for old projects, links, tests and offline fallback.
+    # Generate the unified graph independently. A damaged OPTIONAL context
+    # sidecar must fail closed without making the legacy Canvas unusable.
     from build_unified_canvas import build_unified
-    build_unified(root)
+    try:
+        build_unified(root)
+    except (ResearchError, ValueError):
+        html=html.replace('<a href="../dashboard/index.html">返回经典工作台</a>',
+                          '<span>统一节点画布的数据校验失败；经典画布仍可使用</span> · '
+                          '<a href="../dashboard/index.html">返回经典工作台</a>')
+    else:
+        html=html.replace('<a href="../dashboard/index.html">返回经典工作台</a>',
+                          '<a href="unified.html">统一节点画布</a> · '
+                          '<a href="../dashboard/index.html">返回经典工作台</a>')
+    atomic_text(dest,html)
     return dest
 
 
