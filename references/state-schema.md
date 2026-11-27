@@ -36,7 +36,7 @@ New entities in the existing `items.json`:
 - `source-checked` is valid only for an actually marked primary-inspected source, not an abstract. `experiment-observed` requires Result with an observation and artifact path. These are metadata safeguards, *not automatic source verification*. Contradiction marks a related Claim and downstream dependents for review, never auto-adjusts scientific truth.
 
 `session_refs.json = {"session_refs": [...]}`:
-- stable `SESS-xxxx`, `provider` (`codex|chatgpt|other`), `workspace_id`, `session_id`, optional HTTPS `url`, `url_verified=false`, `entity_ids[]` and per-entity `roles{}`, recording actor/time.
+- stable `SESS-xxxx`, `provider` (`codex|chatgpt|deepseek|other`), `workspace_id`, `session_id`, optional HTTPS `url`, `url_verified=false`, `entity_ids[]` and per-entity `roles{}`, recording actor/time.
 - Many-to-many association: an Agent Session may link to multiple research IDs and vice versa. No chat text is copied. URL acceptance is not verification of provider support; UI must not open it automatically unless an actual provider adapter verifies it. Unsafe URL shapes are rejected.
 - Unlinking a SessionRef association preserves both the research entity and the historical SessionRef registration.
 
@@ -65,3 +65,8 @@ New data shares revision checking, file journaling and event history. The full
 data contract, commands and ethical boundaries are in
 [`reasoning-v03.md`](reasoning-v03.md). Neither type is a positive planning
 candidate. No new unapproved browser writeback endpoint exists.
+
+
+### v0.5 SessionRef compatibility
+
+`deepseek` is an additive provider value. Existing schema 0.2.0 records are unchanged. Older versions may reject projects containing the new provider; retain a backup and use v0.5 or newer for those projects. No transcript import, session discovery, or verified deep link is implied.

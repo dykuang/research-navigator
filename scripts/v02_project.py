@@ -5,6 +5,7 @@ import json
 import sys
 
 from rn_core import ResearchError, load
+from rn_v02 import SESSION_PROVIDERS
 from rn_domain import (accept_milestone, attach_milestone_evidence, claim_evidence,
                        create_branch, create_milestone, create_session, link_evidence,
                        session_entity_link)
@@ -60,7 +61,7 @@ def main():
     p.add_argument("--claim", required=True)
 
     p = cmd("session-create")
-    p.add_argument("--provider", choices=("codex", "chatgpt", "other"), required=True)
+    p.add_argument("--provider", choices=SESSION_PROVIDERS, required=True)
     p.add_argument("--workspace", required=True)
     p.add_argument("--session-id", required=True)
     p.add_argument("--url", default="")
