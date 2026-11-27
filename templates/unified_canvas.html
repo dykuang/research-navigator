@@ -824,12 +824,12 @@ function connectionDraft(source,target){
       "contributes-to":"depends-on";
     return {operation:"add-relation",params:{source:a.entity_id,target:b.entity_id,relation:rel}};
   }
-  const from=a.kind,to=b.kind;
+  const from=a.id.split(":")[0],to=b.id.split(":")[0];
   const rules={
     "question:item":"addresses","answer:item":"motivates",
     "session:interview":"discussed-in-session","session:question":"discussed-in-session",
     "session:answer":"discussed-in-session",
-    "source:criterion":"context-for","evidence-link:criterion":"context-for",
+    "source:criterion":"context-for","evidence:criterion":"context-for",
     "item:criterion":(["Claim","Result","ExperimentRun","Hypothesis"].includes(a.type)?"informs":"context-for"),
     "question:item-route":"references-route"
   };
