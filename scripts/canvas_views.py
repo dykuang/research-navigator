@@ -15,7 +15,7 @@ from rn_core import ResearchError, atomic_json, load, now, paths, read_json, wor
 
 SCHEMA="canvas-layout-v1"
 LAYOUT_NAME=re.compile(r"^[\w \-]{1,80}$",re.UNICODE)
-NODE_ID=re.compile(r"^(item|source|evidence|session):[A-Za-z0-9-]{1,120}$")
+NODE_ID=re.compile(r"^(item|source|evidence|session|criterion|interview|question|answer):[A-Za-z0-9-]{1,180}$")
 MAX_NODES=20000
 MAX_VIEW_COUNT=100
 
