@@ -426,6 +426,6 @@ def handoff(root):
             "frontier":f["ready"],"blocked":f["blocked"],
             "consensus_note":doc["consensus_note"],
             "accepted_open_questions":doc["accepted_open_questions"],
-            "startup_hint":"在新 Codex Session 中明确调用 $research-navigator 并读取 "
-                           "scripts/interview.py PROJECT_ROOT status/next。"
+            "startup_hint":"在新 Codex、DeepSeek DSH 或其他 Harness 会话中明确激活 research-navigator Skill，"
+                           "并在同一科研项目根目录读取 scripts/interview.py PROJECT_ROOT status/next。"
                            "新会话不保证继承前一个会话的 Skill 激活状态。"}

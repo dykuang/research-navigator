@@ -71,3 +71,8 @@ description: Use when a student, advisor, or first-time user explicitly asks how
 
 介绍 Research Navigator 访谈时，明确每个问题可选已有方案，也可选择「其他」自由输入。Codex 支持原生 `request_user_input` 的模式可显示选择器，否则提供文字 A/B/其他，不假装已经展示原生 UI。离线 Canvas 可生成回答草案，但不自动写入访谈状态。具体命令及兼容性见主 Skill `references/interview-v042.md`。
 
+
+
+## v0.5 development · DeepSeek Harness
+
+Both skills can be installed via the main source checkout's scripts/install_harness.py. Explain the difference between filesystem installation and actual runtime activation. The installed sibling research-navigator/references/harnesses/deepseek.md contains commands and limitations. In DSH use the supported explicit skill loader; do not promise automatic activation, live popup or user PC installation. Read the same project's status/next/handoff to continue a Codex interview. Native questions need a compatible live ask_user_question tool; otherwise text fallback with Other and supplement. Preserve existing help-only/read-only boundaries.

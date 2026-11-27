@@ -26,9 +26,9 @@ Use \`python /PATH/TO/research-navigator/scripts/interview.py PROJECT_ROOT statu
 and \`next\` to recover only the confirmed and unresolved interview context,
 then continue the current highest-value question frontier. The Skill root path
 must be resolved in the user's environment; never assume the placeholder path
-is executable. Prefer the installed \`$research-navigator\` Skill when supported.
+is executable. Explicitly activate the installed \`research-navigator\` Skill using the live harness's supported mechanism.
 
-An independent Codex chat does **not** automatically inherit the previous
+An independent Codex or DeepSeek DSH chat does **not** automatically inherit the previous
 chat's Skill invocation. Explain this honestly. If the Skill is unavailable,
 ask the user to invoke/install it rather than claiming it ran.
 
