@@ -208,16 +208,19 @@ class UnifiedGraphTests(unittest.TestCase):
     def test_layout_persists_new_namespaces_without_canonical_write(self):
         ident=self.interview()
         milestone=create_milestone(self.root,"Toy milestone",["Outcome documented"])
+        branch=create_branch(self.root,"Toy route","Test shared baseline",["Stop if invalid"])
         base=load(self.root)
         ids=["question:"+ident+"-Q-0001","criterion:"+milestone["id"]+"-C-001"]
         view={"schema_version":"canvas-layout-v1",
               "project_id":base["project"]["project_id"],
               "view_name":"unified-test","graph_revision":base["project"]["revision"],
               "positions":{ident:{"x":i*120,"y":i*90} for i,ident in enumerate(ids)},
-              "viewport":{"x":0,"y":0,"z":1},"collapsed":[],"pinned_groups":[]}
+              "viewport":{"x":0,"y":0,"z":1},"collapsed":[],
+              "pinned_groups":["branch:item:"+branch["id"]]}
         save_layout(self.root,view)
         saved=load_views(self.root)["views"]["unified-test"]
         self.assertEqual(set(saved["positions"]),set(ids))
+        self.assertIn("branch:item:"+branch["id"],saved["pinned_groups"])
         self.assertEqual(load(self.root),base)
     def test_script_injection_encoded_in_unified_export(self):
         self.interview()
