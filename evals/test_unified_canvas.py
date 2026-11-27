@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
 
 from rn_core import (init_project,add_item,add_source,load,ResearchError,
-                     change_status,add_relation)
+                     change_status,add_relation,new_item,workspace_lock,write)
 from rn_domain import (create_branch,create_milestone,attach_milestone_evidence,
                        create_session,session_entity_link,link_evidence)
 from rn_interview import start,add_questions,answer,request_exit,confirm_exit,read
@@ -50,6 +50,18 @@ class UnifiedGraphTests(unittest.TestCase):
     def context_args(self,source,target,relation="addresses"):
         return {"from":source,"to":target,"relation":relation,
                 "expected_context_revision":read_context(self.root)["revision"]}
+    def test_500_plus_nodes_stable_and_no_scientific_inference(self):
+        with workspace_lock(self.root):
+            state=load(self.root)
+            for i in range(510):
+                new_item(state,"Idea","SYNTHETIC bulk hypothesis "+str(i),"topic",actor="user")
+            write(self.root,state,[{"action":"synthetic-bulk-fixture",
+                                    "actor":"tool","reason":"performance-only fixture"}])
+        data=self.graph()
+        self.assertGreaterEqual(len(data["nodes"]),510)
+        self.assertEqual(len({n["id"] for n in data["nodes"]}),len(data["nodes"]))
+        self.assertTrue(all(n["statuses"]["epistemic_status"]!="experimentally-supported"
+                            for n in data["nodes"] if n["kind"]=="item"))
     def test_empty_project_and_legacy_canvas_untouched(self):
         original=load(self.root)
         graph=self.graph()
