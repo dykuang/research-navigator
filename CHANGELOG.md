@@ -84,3 +84,12 @@ See [v0.2 release checklist](docs/release-v0.2.md), [Canvas guide](references/ca
 - Guaranteed normal-chat fallback for unsupported/failing/cancelled/no-response native Codex question UI; textual options always include Other and optional supplementary explanation.
 - Saved per-answer supplementary user comments across sessions, including alongside a preset choice, with independent confirmation and revision protection.
 - New issue #56 safety tests cover failure modes and Chromium unsaved drafts. No automatic UI success claim.
+
+
+## Unreleased — v0.6.0 Unified Research Canvas & Node Editor
+
+- New unified graph projecting canonical research items/evidence/ExperimentRuns/SessionRefs, Grilling interview Q&A and derived scientific Milestone criteria into one typed diagram.
+- Separate Blender-like unified Canvas with sockets, curved wires, filters, Grilling Other/supplement draft, SessionRef navigation and old Canvas fallback.
+- Protected cross-domain reference-only links through preview → pending proposal → interactive terminal approval; standalone context revision and provenance do not grant scientific truth.
+- Existing canvas-layout-v1 supports additional node namespaces. v0.5 provider implementation integrated **into v0.6 feature branch only**, not merged into main.
+- Multi-round synthetic scientist tests, previous-version regression, Windows/Linux and Chromium CI. No stable v0.6 tag, Release or owner-client certification.

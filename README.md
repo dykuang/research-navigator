@@ -142,3 +142,17 @@ Codex 的部分默认模式还提供非阻塞 `request_user_input_async`，需�
 ## v0.5 development — Multi-Harness Research Navigation
 
 The development branch adds a read-only DSH question adapter, opt-in two-skill installer/doctor, DeepSeek SessionRef, and explicit shared-project interview handoff. See [DSH guide](references/harnesses/deepseek.md) and [capability contract](references/harnesses/contract.md). Existing Codex flags are preserved. The source-level DSH schema is checked at upstream commit 4b399c39; real Web/Desktop/Windows activation remains unverified. No new scientific schema migration or automatic session discovery. Older software may reject new deepseek provider records. No release tag is claimed.
+
+
+## v0.6 · Unified Research Node Editor（开发中）
+
+本版本将 **Grilling 问题/回答、研究路线、实验运行、证据与反证、科研 Milestone 验收条件、SessionRef** 放进同一个带有**类型化端口和贝塞尔连接线**的可平移/缩放画布。保留经典 Canvas 与 SVG Dashboard 作为离线兼容入口。
+
+- 运行 python scripts/build_dashboard.py PROJECT_ROOT，然后打开 research/canvas/unified.html。经典 index.html 不变。
+- 支持一张图查看研究问题、用户自定义回答及补充说明、假设、实验/负结果、支持或反驳证据、科研 Milestone 和 Codex/DeepSeek 会话引用。
+- 由输出端口拖到目标输入端口可生成连线草案。浏览器**不会直接批准**；有真实本机服务时仍需预览、排队、在交互终端运行 local_editor.py approve 才能应用。离线模式仅导出草案。
+- 跨领域上下文连接单独保存在 research/canvas/context-links.json，仅代表来源与讨论关联，**不是新科研真值数据库**，也不会使证据自动通过审核。
+- 原有布局 JSON 可恢复并覆盖新访谈节点，用户可重新保存命名视图。输入不能越过归档/回收保护，不能自动改变科学结论。
+- v0.5 Multi-Harness 代码已整合到**v0.6 开发分支**供兼容测试；v0.5 PR #66 尚未合并 main，不能据此宣布 v0.5 正式发布。
+
+详见 references/unified-canvas-v06.md 和 docs/roadmap/v0.6.md。本版本尚未合并/发布；实际 Codex/DeepSeek 桌面客户端交互仍需真实环境验收。
