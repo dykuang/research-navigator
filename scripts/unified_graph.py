@@ -198,15 +198,16 @@ def _criteria(state, nodes, edges):
                                              "scientifically_verified": False}})
     return True
 
-def validate_context_link(graph, source, target, relation):
+def validate_context_link(graph, source, target, relation, *, for_edit=True):
     validate_link_fields(source, target, relation)
     nodes = {n["id"]: n for n in graph["nodes"]}
     if source not in nodes or target not in nodes:
         raise ResearchError("Context reference missing graph node")
-    if nodes[source].get("statuses", {}).get("lifecycle_status") not in (None, "active"):
-        raise ResearchError("Archived source cannot be edited outside formal revival")
-    if nodes[target].get("statuses", {}).get("lifecycle_status") not in (None, "active"):
-        raise ResearchError("Archived target cannot be edited outside formal revival")
+    if for_edit:
+        if nodes[source].get("statuses", {}).get("lifecycle_status") not in (None, "active"):
+            raise ResearchError("Archived source cannot be edited outside formal revival")
+        if nodes[target].get("statuses", {}).get("lifecycle_status") not in (None, "active"):
+            raise ResearchError("Archived target cannot be edited outside formal revival")
     if relation == "informs":
         if nodes[source]["type"] not in ("Claim", "Result", "ExperimentRun", "Hypothesis"):
             raise ResearchError("Only scientific claim, result, run or hypothesis informs criterion")
@@ -227,7 +228,7 @@ def unified_graph(root, *, include_context=True):
     # Validate stored references against the present graph, including archive gates.
     shallow = {"nodes": list(nodes.values())}
     for link in extra["links"]:
-        validate_context_link(shallow, link["from"], link["to"], link["type"])
+        validate_context_link(shallow, link["from"], link["to"], link["type"], for_edit=False)
         edges.append({"id": link["id"], "from": link["from"], "to": link["to"],
                       "type": link["type"], "provenance": {
                           "collection": "research/canvas/context-links",
@@ -261,6 +262,70 @@ def inspect_context_candidate(root, source, target, relation, expected_revision)
             "impact": "Reference-only, not scientific support, approval or experiment execution",
             "context_revision": graph["context_revision"],
             "scientific_revision_unchanged": True}
+
+def inspect_unlink_candidate(root, link_id, expected_revision):
+    graph=unified_graph(root)
+    if graph["project_revision"]!=expected_revision:
+        raise ResearchError("stale proposal; refresh scientific graph")
+    link=next((e for e in graph["edges"]
+               if e["id"]==link_id and e["provenance"].get("collection")==
+                 "research/canvas/context-links"),None)
+    if link is None:
+        raise ResearchError("Context reference not found; cannot unlink canonical scientific edge")
+    return {"before": {"id":link_id,"from":link["from"],"to":link["to"],
+                       "type":link["type"]},
+            "after": None,"context_revision":graph["context_revision"],
+            "impact":"Reference-only removal; scientific evidence remains unchanged",
+            "scientific_revision_unchanged":True}
+
+
+def commit_context_proposal(root, proposal, *, proposal_id):
+    """Called **only inside existing workspace_lock**, after terminal approval.
+
+    Idempotent after a crash between sidecar write and proposal acknowledgement;
+    context revision is independent of scientific truth revision.
+    """
+    from rn_core import atomic_json, now
+    args=proposal["params"]
+    op=proposal["operation"]
+    state=load(root)
+    if state["project"]["revision"]!=proposal["expected_revision"]:
+        raise ResearchError("stale scientific revision for context proposal")
+    context=read_context(root,state)
+    already=next((row for row in context["links"] if row["proposal_id"]==proposal_id),None)
+    if already:
+        if op=="link-context" and already["from"]==args["from"] and already["to"]==args["to"]:
+            # Compare relation separately because the stored key is type.
+            if already["type"]==args["relation"]:
+                return {"link_id":already["id"],"recovered":True}
+        raise ResearchError("proposal ID was previously used for a different operation")
+    if context["revision"]!=args["expected_context_revision"]:
+        raise ResearchError("stale context revision; refresh before approving")
+    if op=="link-context":
+        # Validate against the live graph, not only the earlier preview.
+        inspect_context_candidate(root,args["from"],args["to"],args["relation"],
+                                  proposal["expected_revision"])
+        raw=json.dumps([proposal_id,args["from"],args["to"],args["relation"]],
+                       ensure_ascii=False,separators=(",",":"))
+        lid="context:"+hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
+        row={"id":lid,"from":args["from"],"to":args["to"],
+             "type":args["relation"],"reason":proposal["reason"],
+             "proposal_id":proposal_id,"recorded_at":now()}
+        context["links"].append(row)
+        result={"link_id":lid,"context_only":True}
+    elif op=="unlink-context":
+        previous=next((row for row in context["links"]
+                       if row["id"]==args["link_id"]),None)
+        if previous is None:
+            raise ResearchError("Context link not found")
+        context["links"].remove(previous)
+        result={"unlinked":args["link_id"],"context_only":True}
+    else:
+        raise ResearchError("not a context operation")
+    context["revision"]+=1
+    atomic_json(context_path(root),context)
+    return result
+
 
 def main():
     p=argparse.ArgumentParser(description="Read-only v0.6 unified research graph")
