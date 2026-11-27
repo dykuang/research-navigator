@@ -118,7 +118,7 @@ button:disabled{opacity:.5;cursor:default}
 <label for="viewName">布局名称</label><input id="viewName" value="default" maxlength="80">
 <div class="row"><button id="saveLayout">保存布局</button><button id="loadLayout">恢复布局</button></div>
 <div class="row"><button id="exportLayout">导出 JSON</button><button id="importLayout">导入 JSON</button></div>
-<div class="row"><button id="resetLayout">重新布局</button><button id="exportSVG">导出 SVG</button></div><div class="row"><button id="pinGroup">固定所选模块组</button></div>
+<div class="row"><button id="resetLayout">重新布局</button><button id="exportSVG">导出 SVG</button></div><div class="row"><button id="pinGroup">固定研究路线/模块组</button></div>
 <input id="fileInput" type="file" accept=".json,application/json">
 <p class="info">布局只包含节点位置、视口、分组折叠信息；不包含科研状态或审批结果。离线保存于本浏览器，并可导出为 JSON 供本机 CLI 同步。</p>
 </div><div><div class="warn info">离线画布只保存视图布局。连接本机 #6 Bridge 后可以提交科研变更提案，但不能从浏览器直接批准、恢复档案或确认科学真值。</div></div></aside>
@@ -290,6 +290,24 @@ function render(){
   marker.appendChild(makeSvg("path",{d:"M 0 0 L 10 5 L 0 10 z",fill:"#98aabd"}));
   defs.appendChild(marker);svg.appendChild(defs);
   const active=state.visible;
+  // Saved subgraphs are visual groups, not additional scientific relations.
+  for(const group of state.pinnedGroups){
+    if(!group.startsWith("branch:"))continue;
+    const branchId=group.slice(7),branch=byId.get(branchId);
+    if(!branch||branch.type!=="ResearchBranch")continue;
+    const members=[branchId,...allEdges.filter(e=>e.type==="member-of"&&e.to===branchId)
+      .map(e=>e.from)].filter(id=>active.has(id)&&state.positions[id]);
+    if(!members.length)continue;
+    const xs=members.map(id=>state.positions[id].x);
+    const ys=members.map(id=>state.positions[id].y);
+    const minx=Math.min(...xs)-30,miny=Math.min(...ys)-38;
+    const maxx=Math.max(...xs)+WIDTH+30,maxy=Math.max(...ys)+HEIGHT+30;
+    svg.appendChild(makeSvg("rect",{x:minx,y:miny,width:maxx-minx,height:maxy-miny,rx:16,
+      fill:"#dcf4ee","fill-opacity":.42,stroke:"#4aa797","stroke-width":2,
+      "stroke-dasharray":"8 6"}));
+    const label=makeSvg("text",{x:minx+11,y:miny+22,fill:"#267468","font-size":13});
+    label.textContent="研究路线分组："+branch.label;svg.appendChild(label);
+  }
   for(const e of allEdges){
     if(!active.has(e.from)||!active.has(e.to))continue;
     const from=state.positions[e.from],to=state.positions[e.to];if(!from||!to)continue;
@@ -963,7 +981,15 @@ $("saveLayout").onclick=saveLayout;$("loadLayout").onclick=loadLayout;
 $("exportLayout").onclick=exportLayout;$("importLayout").onclick=()=>$("fileInput").click();
 $("fileInput").onchange=ev=>importLayout(ev.target.files[0]);
 $("resetLayout").onclick=()=>{const defaults=defaultPositions();for(const node of graph.nodes){if(state.pinnedGroups.has(node.module||"session")&&state.positions[node.id])defaults[node.id]=state.positions[node.id]}state.positions=defaults;state.hidden.clear();fitAll();notice("已重新布局，固定的模块组位置保留（尚未保存）")};
-$("pinGroup").onclick=()=>{if(!state.selected){notice("先选择所属模块的节点");return}const group=byId.get(state.selected).module||"session";if(state.pinnedGroups.has(group)){state.pinnedGroups.delete(group);notice("已解除模块组固定："+group)}else{state.pinnedGroups.add(group);notice("已固定模块组："+group)} };
+$("pinGroup").onclick=()=>{
+  if(!state.selected){notice("先选择一个研究节点或路线");return}
+  const selected=byId.get(state.selected);
+  const group=selected.type==="ResearchBranch"?"branch:"+selected.id:
+    (selected.module||"session");
+  if(state.pinnedGroups.has(group)){state.pinnedGroups.delete(group);notice("已解除分组："+group)}
+  else{state.pinnedGroups.add(group);notice("已固定分组："+group)}
+  render();
+};
 $("exportSVG").onclick=exportSvg;
 viewport.addEventListener("keydown",ev=>{
   if(ev.target!==viewport)return;
