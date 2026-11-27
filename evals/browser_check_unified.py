@@ -108,6 +108,7 @@ def main():
                 page.locator("#previewSemantic").click()
                 expect(page.locator("#queueSemantic")).to_be_enabled()
                 page.locator("#queueSemantic").click()
+                expect(page.locator("#semanticState")).to_contain_text("待终端审批")
                 pending=[p for p in (root/"research"/"canvas"/"proposals").glob("*.json")
                          if json.loads(p.read_text(encoding="utf-8"))["status"]=="pending"]
                 assert len(pending)==1
