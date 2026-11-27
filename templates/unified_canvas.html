@@ -59,6 +59,14 @@ button:disabled{opacity:.5;cursor:default}
 .node.answer-node{border-left-color:#de9b42}
 .node.question-node{border-left-color:#327cb4}
 .node.criterion-node{border-left-color:#8c71cd}
+.interview-choices{border:1px solid #d7e5ef;background:#f6fafe;border-radius:9px;padding:9px;margin:12px 0}
+.interview-choices label{font-weight:500;margin:7px 0;padding:6px;border-radius:7px;background:#fff}
+.interview-choices input[type=radio]{width:auto;margin-right:9px}
+.interview-choices textarea{width:100%;min-height:65px;border:1px solid #c5d6e4;
+  border-radius:8px;padding:8px;font:12px system-ui}
+.interview-choices textarea[hidden],.interview-choices pre[hidden]{display:none}
+.interview-choices button{margin-top:8px}
+.interview-choices pre{white-space:pre-wrap;overflow-wrap:anywhere}
 #mobileInspectorToggle,#closeMobileInspector{display:none}
 @media(max-width:1050px){#app{grid-template-columns:205px minmax(0,1fr)}#inspector{position:absolute;right:0;top:54px;width:260px;bottom:0;z-index:8;box-shadow:-8px 0 20px #1e34471a}#workspace{grid-column:2} }
 @media(max-width:680px){
@@ -123,7 +131,7 @@ button:disabled{opacity:.5;cursor:default}
 </section>
 <aside id="inspector" aria-live="polite"><button id="closeMobileInspector" aria-controls="inspector">← 返回画布</button><div><h2>节点详情</h2><div id="details" class="info">请选择画布中的研究节点。关联证据、实验状态与分支信息在此展示。</div></div>
 <div id="sessionInspector"><h2>Agent 会话溯源</h2>
-<label for="sessionProviderFilter">Provider</label><select id="sessionProviderFilter"><option value="">全部</option><option value="codex">Codex</option><option value="chatgpt">ChatGPT</option><option value="other">Other</option></select>
+<label for="sessionProviderFilter">Provider</label><select id="sessionProviderFilter"><option value="">全部</option><option value="codex">Codex</option><option value="chatgpt">ChatGPT</option><option value="deepseek">DeepSeek</option><option value="other">Other</option></select>
 <label for="sessionWorkspaceFilter">工作空间筛选</label><input id="sessionWorkspaceFilter" placeholder="Workspace ID"><div id="sessionRecords" class="info">选择节点查看关联会话</div>
 <p class="info">只显示元数据。未验证的 URL 不会自动打开，支持复制真实 Session ID。</p></div><div id="semanticEditor">
 <h2>科研语义提案</h2>
@@ -387,10 +395,74 @@ function selectNode(id){
     section("规划资格",node.actionable?"当前允许规划，仍需核验证据":"当前不得自动纳入正向规划或标记科学验证");
   section("相关关系",related.length?related.map(e=>e.from+" —"+e.type+"→ "+e.to+
     " ("+e.provenance.collection+")").join("\n"):"暂无");
+  if(node.kind==="question")renderInterviewChoices(box,node);
   renderSessions(id);
   const stamp=document.createElement("div");stamp.className="info";
   stamp.textContent="节点修订 "+safeText(node.revision)+" · 操作不修改研究状态";box.appendChild(stamp);
 }
+function renderInterviewChoices(container,node){
+  const data=node.metadata||{};
+  const wrap=document.createElement("div");wrap.className="interview-choices";
+  const title=document.createElement("strong");title.textContent="当前 Grilling 问题 · 自由回答草案";
+  wrap.appendChild(title);
+  const explain=document.createElement("p");explain.className="info";
+  explain.textContent="本画布只能生成可复制的回答草案。实际确认须在研究访谈会话中完成；回答不是科学证据。";
+  wrap.appendChild(explain);
+  const choices=Array.isArray(data.choices)?data.choices:[];
+  const controls=[];
+  for(const c of choices){
+    const label=document.createElement("label");
+    const input=document.createElement("input");input.type="radio";
+    input.name="rn-unified-interview-choice";input.value=c.id;
+    label.appendChild(input);
+    const text=document.createElement("span");
+    text.textContent=c.label+" — "+c.description+
+      (c.id===data.recommended_choice_id?"（建议，非自动选择）":"");
+    label.appendChild(text);wrap.appendChild(label);
+    controls.push(input);
+  }
+  const otherLabel=document.createElement("label");
+  const otherInput=document.createElement("input");otherInput.type="radio";
+  otherInput.name="rn-unified-interview-choice";otherInput.value="other";
+  otherLabel.appendChild(otherInput);
+  const otherText=document.createElement("span");
+  otherText.textContent="其他／自定义（可以提出全新的研究思路）";
+  otherLabel.appendChild(otherText);wrap.appendChild(otherLabel);
+  controls.push(otherInput);
+  const custom=document.createElement("textarea");custom.hidden=true;
+  custom.setAttribute("aria-label","Grilling 自定义答案");
+  custom.placeholder="输入你自己的答案（不局限于建议项）";wrap.appendChild(custom);
+  const extraLabel=document.createElement("label");
+  extraLabel.textContent="补充说明（可选；即使选择预设项也可填写）";
+  const extra=document.createElement("textarea");extra.setAttribute("aria-label","Grilling 补充说明");
+  extra.placeholder="理由、限制条件或其他看法";extraLabel.appendChild(extra);wrap.appendChild(extraLabel);
+  const draft=document.createElement("pre");draft.hidden=true;wrap.appendChild(draft);
+  const button=document.createElement("button");button.type="button";
+  button.textContent="生成回答草案（不会保存）";button.disabled=true;wrap.appendChild(button);
+  function refresh(){
+    const selected=controls.find(input=>input.checked);
+    custom.hidden=!(selected&&selected.value==="other");
+    button.disabled=!(selected&&(selected.value!=="other"||custom.value.trim()));
+    draft.hidden=true;
+  }
+  controls.forEach(input=>input.addEventListener("change",refresh));
+  custom.addEventListener("input",refresh);
+  extra.addEventListener("input",refresh);
+  button.onclick=()=>{
+    if(button.disabled)return;
+    const selected=controls.find(input=>input.checked);
+    const chosen=choices.find(c=>c.id===selected.value);
+    const response=selected.value==="other"?
+      "其他："+custom.value.trim():
+      "选项 "+selected.value+" — "+(chosen?.label||"");
+    draft.textContent=node.entity_id+" "+response+
+      (extra.value.trim()?"\n补充："+extra.value.trim():"")+
+      "\n请复制到 Codex/DeepSeek 访谈会话，明确确认后再保存。";
+    draft.hidden=false;
+  };
+  container.appendChild(wrap);
+}
+
 function startNodeDrag(ev,id){
   if(ev.button!==0||ev.target.closest(".socket"))return;
   ev.stopPropagation();
