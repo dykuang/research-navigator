@@ -1,4 +1,6 @@
 import sys
+import os
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -19,6 +21,28 @@ class InstallTests(unittest.TestCase):
             self.assertFalse(operate(root,"uninstall")["applied"])
             self.assertTrue(operate(root,"uninstall",True)["applied"])
             self.assertTrue(all(not (root/n).exists() for n in NAMES))
+    def test_installed_cli_generates_only_owned_caches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project=Path(tmp)/"project"
+            project.mkdir()
+            root=skill_root("deepseek","project",project)
+            operate(root,"install",True)
+            cli=root/NAMES[0]/"scripts"/"update_project.py"
+            env=dict(os.environ)
+            env.pop("PYTHONDONTWRITEBYTECODE",None)
+            env.pop("PYTHONPYCACHEPREFIX",None)
+            subprocess.run([sys.executable,str(cli),"init",str(project),"--name","SYNTHETIC installed CLI"],env=env,check=True,capture_output=True)
+            cache=root/NAMES[0]/"scripts"/"__pycache__"
+            self.assertTrue(list(cache.glob("*.pyc")))
+            self.assertTrue(all(x["owned_unmodified"] for x in operate(root,"doctor")["skills"]))
+            marker=cache/"user-notes.txt"
+            marker.write_text("preserve",encoding="utf-8")
+            with self.assertRaises(ValueError): operate(root,"uninstall",True)
+            self.assertEqual(marker.read_text(encoding="utf-8"),"preserve")
+            marker.unlink()
+            before=(project/"research"/"state"/"project.json").read_bytes()
+            self.assertTrue(operate(root,"uninstall",True)["applied"])
+            self.assertEqual((project/"research"/"state"/"project.json").read_bytes(),before)
     def test_modified_bundle_is_preserved(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)/"skills"

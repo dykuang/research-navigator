@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -38,6 +39,8 @@ def _regular_files(root):
             raise ValueError("symlinks not supported: "+str(p))
         if p.is_file():
             yield p
+        elif not p.is_dir():
+            raise ValueError("non-regular file not supported: "+str(p))
 
 def _bundle_files(source, name):
     if name == NAMES[0]:
@@ -62,6 +65,15 @@ def _bundle_files(source, name):
 def _hash(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
+def _generated_cache(rel, tracked):
+    """Recognize only conventional interpreter caches for manifest-owned .py files."""
+    if rel.parent.name != "__pycache__":
+        return False
+    match=re.fullmatch(r"(.+)\.(?:cpython|pypy)-[0-9]+[a-z]*(?:\.opt-[12])?\.pyc",rel.name)
+    if not match:
+        return False
+    return (rel.parent.parent/(match.group(1)+".py")).as_posix() in tracked
+
 def _owned(dest, name):
     if dest.is_symlink() or not dest.is_dir():
         return False
@@ -72,11 +84,24 @@ def _owned(dest, name):
         obj = json.loads(manifest.read_text(encoding="utf-8"))
         if obj.get("format") != 1 or obj.get("skill") != name:
             return False
-        actual = {p.relative_to(dest).as_posix(): _hash(p) for p in _regular_files(dest) if p != manifest}
-        # Extra empty directories also count as local modifications.
-        expected_dirs = {str(parent) for key in actual for parent in Path(key).parents if str(parent)!="."}
-        actual_dirs = {str(p.relative_to(dest)) for p in dest.rglob("*") if p.is_dir()}
-        return bool(actual) and actual == obj.get("files") and actual_dirs == expected_dirs
+        tracked=obj.get("files")
+        if not isinstance(tracked,dict) or not tracked:
+            return False
+        actual={}
+        cache_dirs=set()
+        for p in _regular_files(dest):
+            if p == manifest:
+                continue
+            rel=p.relative_to(dest)
+            key=rel.as_posix()
+            if key not in tracked and _generated_cache(rel,tracked):
+                cache_dirs.add(str(rel.parent))
+                continue
+            actual[key]=_hash(p)
+        # Unknown cache contents and arbitrary extra directories still block removal.
+        expected_dirs={str(parent) for key in actual for parent in Path(key).parents if str(parent)!="."}
+        actual_dirs={str(p.relative_to(dest)) for p in dest.rglob("*") if p.is_dir()}
+        return actual == tracked and actual_dirs == expected_dirs | cache_dirs
     except (OSError, ValueError, TypeError, AttributeError):
         return False
 
