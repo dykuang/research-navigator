@@ -96,8 +96,9 @@ def _base_node(nid, entity_id, kind, type_, label, description="", *, metadata=N
 
 def _view_ports(node):
     kind = node["kind"]
-    inputs = sorted(t for t, (_, allowed) in CONTEXT_RULES.items() if kind in allowed)
-    outputs = sorted(t for t, (allowed, _) in CONTEXT_RULES.items() if kind in allowed)
+    namespace = node["id"].split(":", 1)[0]
+    inputs = sorted(t for t, (_, allowed) in CONTEXT_RULES.items() if namespace in allowed)
+    outputs = sorted(t for t, (allowed, _) in CONTEXT_RULES.items() if namespace in allowed)
     node["ports"] = {"inputs": inputs, "outputs": outputs}
     node["truth_authority"] = ("interview" if kind in ("interview", "question", "answer")
                               else "presentation-reference" if kind == "criterion"
