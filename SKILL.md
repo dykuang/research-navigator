@@ -163,3 +163,12 @@ python scripts/build_dashboard.py /PROJECT/ROOT
 ## v0.5 development · Cross-Harness activation and Grilling
 
 In DeepSeek Harness (DSH), explicitly load the research-navigator skill, then follow the same existing project validation and interview recovery protocol. Do not assume a new session inherits activation. Read references/harnesses/deepseek.md and references/harnesses/contract.md for the adapter. Only use the DSH blocking ask_user_question when the actual runtime exposes the compatible schema; preview with interview.py PROJECT_ROOT present --question Q-0001 --harness deepseek --capability ask-user. Otherwise request text fallback. Resolve an actual answer with resolve-deepseek and require genuine user confirmation before writing through answer. Pending, skipped, ambiguous, failed or acknowledged delivery is not consent. Preserve Other and supplemental notes; never advance dependent questions without confirmed answers. All scientific state and terminal approval constraints above remain in force. Use deepseek SessionRef only for actual session metadata; do not guess a deep link or import transcripts. Before sending private research data to DSH, review user data-transfer authorization and sandbox/logging policy.
+
+
+## v0.6 · Unified Research Node Editor（开发中的统一可视化入口）
+
+若用户希望从研究思路沿着「Grilling 提问 → 用户自定义回答 → ResearchBranch/Hypothesis → ExperimentRun/Result → 支持/反驳证据 → 科研 Milestone → SessionRef」查看全链路，可在已初始化项目上使用 python scripts/build_dashboard.py PROJECT_ROOT，然后打开 research/canvas/unified.html。原 research/canvas/index.html 仍是经典无限画布回退，不能静默覆盖或迁移原项目。
+
+统一图通过 scripts/unified_graph.py **只读投影**既有科研与访谈状态。访谈回答是用户同意的对话信息，不是科学证明；Milestone 的证据引用和人类验收也不得自动升级为学术事实。上下文连线仅提供来源/讨论关系，存储于独立 research/canvas/context-links.json，并记录 proposal ID、原因与上下文修订。所有科学语义变动仍经过原受限 Proposal/CLI 的预览和本地交互终端确认。离线节点端口和 Grilling 选项仅生成草案，无法写入或批准。不要代替用户确认访谈答案或执行实验。
+
+支持的本机交互页面是 local_editor.py serve PROJECT_ROOT 输出的**私有**本地服务地址下 /unified；/api/unified-graph 受同一 token/Origin 保护。始终保留真实 Codex 选择器缺失时的普通聊天 fallback（备选项 + 其他/自定义 + 补充说明）。跨 Session 的 Skill 激活仍需显式重新调用或经用户主动启用 AGENTS.md 提示。参考 references/unified-canvas-v06.md；v0.5 DeepSeek 功能在该开发分支整合，不代表正式发布或客户端已验收。

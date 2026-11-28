@@ -111,3 +111,10 @@ From the **connected** localhost Canvas, use the semantic proposal panel to `reg
 A user-provided HTTPS URL is metadata; it is **not provider-verified**. No adapter currently sets `url_verified=true`. Therefore the inspector never invents URLs or renders an enabled Open button for unverified sessions. A missing/deleted/permission-denied external session remains a historical reference and degrades to manual ID copy. If a provider adapter is implemented in a future release, it must validate session authority before user-click navigation and warn about other projects. A workspace ID is a scope label, not proof of login or provider ownership.
 
 Check external sharing/privacy rules before publishing Canvas HTML snapshots, which contain research graph metadata. No SessionRef registration, unlinking, or navigation operation upgrades scientific truth.
+
+
+## v0.6 · 统一研究节点画布（与经典画布并存）
+
+统一画布由 python scripts/build_dashboard.py PROJECT_ROOT 生成在 research/canvas/unified.html。它将 Grilling 提问/回答、Claim–Evidence、ResearchBranch、ExperimentRun、Milestone 的独立验收条件、SessionRef 等放在同一画布上。右侧节点输出端口连到目标左侧输入端口时，生成带类型检查的语义提案。节点间的上下文边只说明「讨论/启发/参考」，**不代替**正规的 Claim–Evidence 科学验证或 Milestone 人工验收。
+
+如需真实提交连线，请使用 python scripts/local_editor.py serve PROJECT_ROOT 打开本机 /unified 页面。先预览，再排队，最后在交互终端运行 inspect/approve；浏览器无批准接口。离线模式只支持草案和布局管理。旧 research/canvas/index.html 与经典仪表盘继续工作，原 canvas-layout-v1 视图文件可加载。更多类型、隐私及 SessionRef 说明见 references/unified-canvas-v06.md。

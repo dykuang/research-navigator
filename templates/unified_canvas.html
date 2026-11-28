@@ -1,0 +1,1014 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Research Navigator · Unified Research Node Editor</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI","Microsoft Yahei",sans-serif;color:#16283e;background:#eef3f8;font-size:13px}
+*{box-sizing:border-box}body{margin:0}button,select,input{font:inherit}button{cursor:pointer}
+#app{display:grid;grid-template-columns:235px minmax(0,1fr) 286px;grid-template-rows:54px minmax(0,1fr);height:100vh;min-height:450px}
+header{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:0 18px;background:#12283e;color:#f3fbff;border-bottom:1px solid #35516b}
+header strong{font-size:16px}header small{color:#a9c4cf;flex:1}header a{color:#c2eadd}
+aside{background:#fff;min-height:0;overflow:auto;padding:16px;border-right:1px solid #dbe4ed}
+#inspector{border-right:0;border-left:1px solid #dbe4ed}
+aside h2{font-size:14px;margin:4px 0 15px}aside h3{font-size:12px;margin:19px 0 6px}
+label{display:block;margin:11px 0 4px;font-weight:650;color:#3a5167}
+select,input{width:100%;padding:8px 9px;border:1px solid #cad8e3;border-radius:8px;background:#fff;color:#16283e}
+.row{display:flex;gap:6px;flex-wrap:wrap}.row button{flex:1}
+button{border:1px solid #c5d6e4;background:#fff;border-radius:8px;padding:7px 9px;color:#21485c}
+button:hover,button:focus-visible{background:#e3f2f4;outline-color:#258c97}
+button.primary{background:#146f7a;color:white;border-color:#146f7a}
+button:disabled{opacity:.5;cursor:default}
+.chip{display:inline-block;background:#e6eef5;color:#3b546d;border-radius:7px;padding:2px 6px;margin:2px;font-size:11px}
+.info{font-size:12px;color:#607488;line-height:1.55}.warn{background:#fff7e7;padding:9px;border:1px solid #f2d9a6;border-radius:9px}
+#workspace{min-width:0;min-height:0;position:relative;overflow:hidden;background-color:#f4f7fb;background-image:radial-gradient(#b4c3d5 0.8px,transparent 0.8px);background-size:21px 21px;touch-action:none;cursor:grab}
+#workspace.dragging{cursor:grabbing}
+#world{position:absolute;top:0;left:0;transform-origin:0 0;width:1px;height:1px}
+#edges{position:absolute;top:0;left:0;width:1px;height:1px;overflow:visible;pointer-events:none}
+.node{position:absolute;width:190px;min-height:83px;border:1px solid #9bb3cb;border-left:4px solid #4a8b9a;border-radius:11px;padding:9px;background:#fff;box-shadow:0 5px 15px #17344c18;user-select:none;touch-action:none;cursor:move}
+.node:focus-visible,.node.selected{outline:2px solid #176e7d;outline-offset:3px;z-index:2}
+.node.parked,.node.quarantined,.node.retired{opacity:.78;background:#fffaf2;border-left-color:#ce9b55}
+.node.needs-review,.node.blocked{border-left-color:#bc6872}
+.node .type{font-size:10px;color:#637b90;font-weight:800;text-transform:uppercase}
+.node .heading{font-size:12px;font-weight:700;line-height:1.3;max-height:34px;overflow:hidden;margin-top:4px}
+.node .foot{font-size:10px;color:#607488;margin-top:7px}
+#toolbar{position:absolute;top:12px;left:12px;display:flex;gap:6px;flex-wrap:wrap;background:#ffffffee;border:1px solid #dce4eb;border-radius:11px;padding:6px;z-index:5;max-width:calc(100% - 24px)}
+#toolbar button{padding:6px 9px}
+#hint{position:absolute;left:12px;bottom:12px;background:#ffffffed;border-radius:10px;padding:7px 11px;color:#64798d;pointer-events:none;max-width:60%;font-size:11px}
+#minimap{position:absolute;bottom:12px;right:12px;width:175px;height:125px;background:#fff;border:1px solid #b9ccda;border-radius:10px;box-shadow:0 4px 15px #203a4f1b;z-index:5;cursor:pointer}
+#inspector h3{border-bottom:1px solid #e9eff5;padding-bottom:6px}
+#inspector pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.5;background:#f4f7fb;border-radius:8px;padding:10px;max-height:220px;overflow:auto}
+#inspector .relation{padding:6px 0;border-bottom:1px solid #edf2f6;overflow-wrap:anywhere}
+#notice{font-size:11px;line-height:1.5;padding:10px;background:#ecf7f3;border-radius:8px;color:#28655f}
+#counts{margin:10px 0 4px;color:#546b7e;font-size:11px}
+#fileInput{display:none}
+#semanticEditor{border-top:1px solid #dbe4ed;padding-top:12px}
+#semanticEditor textarea{width:100%;min-height:105px;resize:vertical;border:1px solid #c5d6e4;border-radius:8px;font:12px/1.5 ui-monospace,Consolas,monospace;padding:7px}
+#semanticEditor button{min-width:94px}
+#semanticEditor pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;background:#f1f5fa;padding:9px;border-radius:7px}
+#semanticEditor .attention{color:#8e3b2e;font-weight:650}
+#semanticEditor .ok{color:#176b58;font-weight:650}
+.node{overflow:visible}
+.node .socket{position:absolute;width:17px;height:17px;border-radius:50%;top:41%;
+  background:#176d8f;border:3px solid #e2f8ff;box-shadow:0 0 0 1px #176d8f;
+  cursor:crosshair;z-index:4}
+.node .socket.out{right:-11px}.node .socket.in{left:-12px;background:#5d668c}
+.node .socket:hover,.node .socket:focus-visible{outline:3px solid #f7b352;outline-offset:2px}
+.node .socket.hidden{display:none}
+#wireState{position:absolute;right:12px;top:70px;max-width:300px;
+  padding:8px 11px;border:1px solid #b5d1db;border-radius:9px;
+  color:#185164;background:#f4ffffdf;pointer-events:none;z-index:4;font-size:11px}
+.node.answer-node{border-left-color:#de9b42}
+.node.question-node{border-left-color:#327cb4}
+.node.criterion-node{border-left-color:#8c71cd}
+.interview-choices{border:1px solid #d7e5ef;background:#f6fafe;border-radius:9px;padding:9px;margin:12px 0}
+.interview-choices label{font-weight:500;margin:7px 0;padding:6px;border-radius:7px;background:#fff}
+.interview-choices input[type=radio]{width:auto;margin-right:9px}
+.interview-choices textarea{width:100%;min-height:65px;border:1px solid #c5d6e4;
+  border-radius:8px;padding:8px;font:12px system-ui}
+.interview-choices textarea[hidden],.interview-choices pre[hidden]{display:none}
+.interview-choices button{margin-top:8px}
+.interview-choices pre{white-space:pre-wrap;overflow-wrap:anywhere}
+#mobileInspectorToggle,#closeMobileInspector{display:none}
+@media(max-width:1050px){#app{grid-template-columns:205px minmax(0,1fr)}#inspector{position:absolute;right:0;top:54px;width:260px;bottom:0;z-index:8;box-shadow:-8px 0 20px #1e34471a}#workspace{grid-column:2} }
+@media(max-width:680px){
+  #app{grid-template-columns:1fr;grid-template-rows:54px 180px minmax(0,1fr)}
+  aside:not(#inspector){grid-column:1;padding:9px;display:flex;gap:9px;overflow:auto}
+  aside:not(#inspector)>div{min-width:170px}
+  aside:not(#inspector) h2{display:none}
+  #workspace{grid-column:1}
+  #toolbar{top:6px;left:6px}
+  #hint{display:none}
+  #mobileInspectorToggle,#closeMobileInspector{display:inline-block}
+  #inspector{
+    display:block;position:fixed;top:54px;bottom:0;left:0;right:0;
+    width:100%;height:auto;z-index:25;background:#fff;overflow-y:auto;
+    border-left:0;box-shadow:0 -8px 30px #20344922;
+    visibility:hidden;transform:translateX(100%);pointer-events:none;
+    transition:transform .18s ease,visibility .18s;
+  }
+  #inspector.open{visibility:visible;transform:translateX(0);pointer-events:auto}
+  #inspector h2{display:block}
+  #closeMobileInspector{position:sticky;top:0;z-index:2;width:100%;
+    background:#edf6f8;text-align:left;font-weight:700}
+  #sessionInspector,#semanticEditor{margin-top:16px;border-top:1px solid #dbe4ed;padding-top:14px}
+}
+</style></head>
+<body>
+<script type="application/json" id="rn-graph">__RN_GRAPH_JSON__</script>
+<script type="application/json" id="rn-views">__RN_VIEWS_JSON__</script>
+<div id="app">
+<header><strong>◈ Unified Research Node Editor</strong><small id="projectName">科研导航 · 画布只读数据</small><a href="index.html" id="classicCanvasLink">经典画布</a> · <a href="../dashboard/index.html">返回经典工作台</a></header>
+<aside><div>
+<h2>研究探索</h2>
+<label for="view">视图</label><select id="view">
+<option value="all">探索 · All</option><option value="evidence">证据 · Evidence</option>
+<option value="routes">研究路线 · Routes</option><option value="outputs">成果 · Outputs</option>
+<option value="reasoning">科学推理 · Reasoning</option>
+<option value="interview">访谈 · Grilling</option>
+<option value="milestones">里程碑 · Milestones</option>
+<option value="sessions">会话上下文 · Sessions</option>
+<option value="planning">当前规划 · Planning</option><option value="archive">归档探索 · Archive</option>
+</select>
+<label for="search">查找实体或 ID</label><input id="search" placeholder="输入关键词 / 节点 ID" type="search">
+<label for="module">研究模块</label><select id="module"><option value="">全部模块</option></select>
+<label for="lifecycle">生命周期</label><select id="lifecycle"><option value="">全部状态</option><option>active</option><option>parked</option><option>quarantined</option><option>retired</option><option>under-revival-review</option></select>
+<p id="counts"></p>
+<p class="info">一个图追踪访谈问题、答案、研究路线、证据、实验及科学里程碑。连接线不构成科学验证。</p>
+</div><div>
+<h3>画布布局</h3>
+<label for="viewName">布局名称</label><input id="viewName" value="default" maxlength="80">
+<div class="row"><button id="saveLayout">保存布局</button><button id="loadLayout">恢复布局</button></div>
+<div class="row"><button id="exportLayout">导出 JSON</button><button id="importLayout">导入 JSON</button></div>
+<div class="row"><button id="resetLayout">重新布局</button><button id="exportSVG">导出 SVG</button></div><div class="row"><button id="pinGroup">固定研究路线/模块组</button></div>
+<input id="fileInput" type="file" accept=".json,application/json">
+<p class="info">布局只包含节点位置、视口、分组折叠信息；不包含科研状态或审批结果。离线保存于本浏览器，并可导出为 JSON 供本机 CLI 同步。</p>
+</div><div><div class="warn info">离线画布只保存视图布局。连接本机 #6 Bridge 后可以提交科研变更提案，但不能从浏览器直接批准、恢复档案或确认科学真值。</div></div></aside>
+<section id="workspace" aria-label="无限研究画布，可按住空白处拖拽、滚轮缩放、使用键盘导航" tabindex="0">
+<div id="world"><svg id="edges" aria-hidden="true"></svg><div id="nodes"></div></div>
+<div id="toolbar"><button id="zoomIn" aria-label="放大">＋</button><button id="zoomOut" aria-label="缩小">－</button><button id="fit" class="primary">适应画布</button><button id="focus">定位节点</button><button id="unselect">取消选择</button><button id="collapse" title="折叠/展开节点邻居">折叠邻居</button><button id="mobileInspectorToggle" aria-controls="inspector" aria-expanded="false">详情 / 提案</button></div>
+<svg id="minimap" viewBox="0 0 175 125" role="img" aria-label="节点概览迷你地图"></svg>
+<div id="hint">拖动空白处平移 · 滚轮缩放 · 从右侧输出端口拖到左侧输入端口建立待审批连线 · 拖动卡片只改布局</div>
+<div id="wireState" role="status">右侧端口拖线 → 目标左侧端口 · 只生成提案草案</div>
+</section>
+<aside id="inspector" aria-live="polite"><button id="closeMobileInspector" aria-controls="inspector">← 返回画布</button><div><h2>节点详情</h2><div id="details" class="info">请选择画布中的研究节点。关联证据、实验状态与分支信息在此展示。</div></div>
+<div id="sessionInspector"><h2>Agent 会话溯源</h2>
+<label for="sessionProviderFilter">Provider</label><select id="sessionProviderFilter"><option value="">全部</option><option value="codex">Codex</option><option value="chatgpt">ChatGPT</option><option value="deepseek">DeepSeek</option><option value="other">Other</option></select>
+<label for="sessionWorkspaceFilter">工作空间筛选</label><input id="sessionWorkspaceFilter" placeholder="Workspace ID"><div id="sessionRecords" class="info">选择节点查看关联会话</div>
+<p class="info">只显示元数据。未验证的 URL 不会自动打开，支持复制真实 Session ID。</p></div><div id="semanticEditor">
+<h2>科研语义提案</h2>
+<p id="editMode" class="info">离线只读：可以导出提案 JSON，正式修改需要本机提案服务。</p>
+<label for="semanticOperation">操作类型</label>
+<select id="semanticOperation">
+<option value="add-item">创建 Idea / Hypothesis / Task</option>
+<option value="add-branch">创建 ResearchBranch</option>
+<option value="add-milestone">创建科研 Milestone</option>
+<option value="add-relation">建立研究关系</option>
+<option value="unlink-relation">撤销研究关系</option>
+<option value="revise-criterion">修改里程碑条件</option>
+<option value="attach-milestone-evidence">给里程碑关联证据</option>
+<option value="link-evidence">Claim–Evidence 证据链</option>
+<option value="set-status">非关键流程状态</option>
+<option value="archive-route">正式搁置/隔离/终止路线</option>
+<option value="begin-revival-review">启动正式回收复审（第一批准）</option>
+<option value="approve-revival-candidate">创建派生候选（第二批准）</option>
+<option value="reject-revival-review">拒绝回收复审</option>
+<option value="register-session">登记 SessionRef</option><option value="link-session">关联会话和科研实体</option><option value="unlink-session">撤销 SessionRef 关联</option>
+<option value="link-context">建立跨领域上下文引用（不代表科学验证）</option>
+<option value="unlink-context">撤销上下文引用（保留科研真值）</option>
+</select>
+<label for="contextLinks">已登记的跨领域上下文边</label><select id="contextLinks"><option value="">选择已登记边</option></select>
+<button id="prepareUnlinkContext">准备撤销选中上下文边（仍需预览/终端审批）</button>
+<label for="semanticParams">操作参数（可编辑 JSON）</label>
+<textarea id="semanticParams" spellcheck="false" aria-label="语义提案参数 JSON"></textarea>
+<div class="row"><button id="useSelected">使用选中节点</button></div>
+<label for="semanticReason">变更理由（必填）</label>
+<input id="semanticReason" value="Review the proposed research direction before execution" maxlength="1000">
+<div class="row"><button id="previewSemantic" class="primary">模拟影响（不写入）</button><button id="queueSemantic" disabled>提交待审批</button></div>
+<div class="row"><button id="exportSemantic">导出草案 JSON</button><button id="refreshSemantic">刷新状态</button></div>
+<p id="semanticState" class="info" role="status">未提交科研变更</p>
+<pre id="semanticDiff" aria-live="polite">请先预览变更，查看影响范围。</pre>
+</div><div><h3>视图与数据说明</h3><div id="notice">等待载入</div></div></aside>
+</div>
+<script nonce="__CANVAS_NONCE__">
+"use strict";
+(function(){
+let graph=JSON.parse(document.getElementById("rn-graph").textContent);
+const initialViews=JSON.parse(document.getElementById("rn-views").textContent);
+let byId=new Map(graph.nodes.map(n=>[n.id,n]));
+let allEdges=graph.edges;
+const $=id=>document.getElementById(id);
+const viewport=$("workspace"),world=$("world"),svg=$("edges"),cards=$("nodes"),minimap=$("minimap");
+const NS="http://www.w3.org/2000/svg", WIDTH=190, HEIGHT=94;
+const TYPES={
+  all:null,evidence:new Set(["Claim","Result","Source","EvidenceLink","Hypothesis","Milestone","ExperimentRun","MilestoneCriterion"]),
+  routes:new Set(["ResearchBranch","Milestone","ResearchQuestion","Idea","Hypothesis","Experiment","Result","Baseline","Task"]),
+  outputs:new Set(["Milestone","Claim","Artifact","Result","Decision","Source","EvidenceLink","ExperimentRun","DecisionTrace"]),
+  reasoning:new Set(["ResearchQuestion","Hypothesis","Experiment","ExperimentRun","Result","Claim",
+                     "EvidenceLink","Source","Decision","DecisionTrace","Milestone","SessionRef"]),
+  interview:new Set(["GrillingInterview","InterviewQuestion","InterviewAnswer","ResearchBranch","Hypothesis"]),
+  milestones:new Set(["Milestone","MilestoneCriterion","ExperimentRun","Result","Claim","EvidenceLink","Source"]),
+  sessions:new Set(["SessionRef","GrillingInterview","InterviewQuestion","InterviewAnswer","Idea","Hypothesis"])
+};
+const state={positions:{},camera:{x:210,y:180,z:1},selected:null,hidden:new Set(),pinnedGroups:new Set(),drag:null,visible:new Set(),view:"all"};
+let snapshotKey="rn-unified:"+graph.project_id+":views";
+let wireStart=null,wireDragging=false;
+if(location.protocol==="http:"&&location.pathname==="/unified"){
+ document.getElementById("classicCanvasLink").href="/canvas";
+}
+const safeText=s=>String(s==null?"":s);
+function clamp(v,a,b){return Math.min(b,Math.max(a,v))}
+function defaultPositions(){
+  const sorted=graph.nodes.slice().sort((a,b)=>a.id.localeCompare(b.id));
+  const groups=new Map(); sorted.forEach(n=>{const key=n.module||n.kind||"session";if(!groups.has(key))groups.set(key,[]);groups.get(key).push(n)});
+  let group=0;const out={};
+  for(const batch of groups.values()){
+    batch.forEach((n,i)=>{out[n.id]={x:group*465+(i%2)*215,y:Math.floor(i/2)*142}});
+    group++;
+  }
+  return out;
+}
+function validLayout(input){
+  if(!input||input.schema_version!=="canvas-layout-v1"||input.project_id!==graph.project_id)throw Error("布局项目 ID 或版本不匹配");
+  if(typeof input.positions!=="object"||!input.positions||Array.isArray(input.positions))throw Error("布局节点坐标无效");
+  const result={positions:{},camera:{x:210,y:180,z:1},collapsed:[]};
+  for(const [id,p] of Object.entries(input.positions)){
+    if(!byId.has(id))continue;
+    if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y)||Math.abs(p.x)>1e7||Math.abs(p.y)>1e7)throw Error("布局包含非法坐标");
+    result.positions[id]={x:p.x,y:p.y};
+  }
+  const c=input.viewport||{};
+  if(![c.x,c.y,c.z].every(Number.isFinite)||c.z<0.12||c.z>4.5||Math.abs(c.x)>1e7||Math.abs(c.y)>1e7)throw Error("视口数据非法");
+  result.camera={x:c.x,y:c.y,z:c.z};
+  if(Array.isArray(input.collapsed))result.collapsed=input.collapsed.filter(id=>byId.has(id));
+  result.pinnedGroups=Array.isArray(input.pinned_groups)?input.pinned_groups.filter(x=>typeof x==="string"&&x.length<=120):[];
+  return result;
+}
+function applyLayout(input){
+  const checked=validLayout(input),defaults=defaultPositions();
+  state.positions={...defaults,...checked.positions};
+  state.camera=checked.camera;
+  state.hidden=new Set(checked.collapsed);
+  state.pinnedGroups=new Set(checked.pinnedGroups);
+  render();
+}
+function currentLayout(name){
+  return {schema_version:"canvas-layout-v1",project_id:graph.project_id,
+    graph_revision:graph.project_revision,view_name:name||"default",
+    author:"local-browser",saved_at:new Date().toISOString(),
+    positions:state.positions,viewport:state.camera,collapsed:[...state.hidden].sort(),pinned_groups:[...state.pinnedGroups].sort()};
+}
+function readSaved(){
+  try{return JSON.parse(localStorage.getItem(snapshotKey)||"{}")}catch{return {}}
+}
+function writeSaved(value){
+  try{localStorage.setItem(snapshotKey,JSON.stringify(value));return true}
+  catch{return false}
+}
+function chooseStartup(){
+  state.positions=defaultPositions();
+  const named=initialViews.views||{};
+  let layout=named.default;
+  const stored=readSaved();if(stored.default)layout=stored.default;
+  if(layout){try{applyLayout(layout);return}catch(e){$("notice").textContent="保存布局无效，已使用默认布局："+e.message}}
+  fitAll();
+}
+function visibleNodes(){
+  const view=$("view").value,needle=$("search").value.toLocaleLowerCase().trim(),
+        module=$("module").value,life=$("lifecycle").value;
+  let ids=graph.nodes.filter(n=>{
+    const status=n.statuses||{};
+    if(TYPES[view]&&!TYPES[view].has(n.type))return false;
+    if(view==="planning"&&!n.actionable)return false;
+    if(view==="archive"&&status.lifecycle_status==="active")return false;
+    if(view==="archive"&&n.kind!=="item")return false;
+    if(module&&n.module!==module)return false;
+    if(life&&status.lifecycle_status!==life)return false;
+    if(needle&&!(n.label+" "+n.entity_id+" "+n.type).toLocaleLowerCase().includes(needle))return false;
+    return !state.hidden.has(n.id);
+  }).map(n=>n.id);
+  state.visible=new Set(ids);
+  return ids;
+}
+function nodeColor(n){
+  const st=n.statuses||{};
+  if(st.lifecycle_status&&st.lifecycle_status!=="active")return "#c89355";
+  if(st.impact_status==="needs-review"||st.impact_status==="blocked")return "#d47a85";
+  if(n.type==="Milestone"||n.kind==="criterion")return "#667bd5";
+  if(n.kind==="question"||n.kind==="interview")return "#337eb5";
+  if(n.kind==="answer")return "#df9c43";
+  if(n.type==="ResearchBranch")return "#159889";
+  if(n.type==="EvidenceLink"||n.type==="Claim")return "#9866ba";
+  if(n.type==="SessionRef")return "#7f8a9a";
+  return "#4a8b9a";
+}
+function makeSvg(tag,attrs){const el=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));return el}
+function render(){
+  const visible=visibleNodes();world.style.transform="translate("+state.camera.x+"px,"+state.camera.y+"px) scale("+state.camera.z+")";
+  cards.replaceChildren();svg.replaceChildren();
+  const defs=makeSvg("defs",{});
+  const marker=makeSvg("marker",{id:"rnArrow",viewBox:"0 0 10 10",refX:9,refY:5,
+    markerWidth:6,markerHeight:6,orient:"auto-start-reverse"});
+  marker.appendChild(makeSvg("path",{d:"M 0 0 L 10 5 L 0 10 z",fill:"#98aabd"}));
+  defs.appendChild(marker);svg.appendChild(defs);
+  const active=state.visible;
+  // Saved subgraphs are visual groups, not additional scientific relations.
+  for(const group of state.pinnedGroups){
+    if(!group.startsWith("branch:"))continue;
+    const branchId=group.slice(7),branch=byId.get(branchId);
+    if(!branch||branch.type!=="ResearchBranch")continue;
+    const members=[branchId,...allEdges.filter(e=>e.type==="member-of"&&e.to===branchId)
+      .map(e=>e.from)].filter(id=>active.has(id)&&state.positions[id]);
+    if(!members.length)continue;
+    const xs=members.map(id=>state.positions[id].x);
+    const ys=members.map(id=>state.positions[id].y);
+    const minx=Math.min(...xs)-30,miny=Math.min(...ys)-38;
+    const maxx=Math.max(...xs)+WIDTH+30,maxy=Math.max(...ys)+HEIGHT+30;
+    svg.appendChild(makeSvg("rect",{x:minx,y:miny,width:maxx-minx,height:maxy-miny,rx:16,
+      fill:"#dcf4ee","fill-opacity":.42,stroke:"#4aa797","stroke-width":2,
+      "stroke-dasharray":"8 6"}));
+    const label=makeSvg("text",{x:minx+11,y:miny+22,fill:"#267468","font-size":13});
+    label.textContent="研究路线分组："+branch.label;svg.appendChild(label);
+  }
+  for(const e of allEdges){
+    if(!active.has(e.from)||!active.has(e.to))continue;
+    const from=state.positions[e.from],to=state.positions[e.to];if(!from||!to)continue;
+    const x1=from.x+WIDTH,y1=from.y+HEIGHT/2,x2=to.x,y2=to.y+HEIGHT/2;
+    const bend=Math.max(55,Math.abs(x2-x1)*0.42);
+    const path=makeSvg("path",{d:"M "+x1+" "+y1+" C "+(x1+bend)+" "+y1+" "+(x2-bend)+" "+y2+" "+x2+" "+y2,
+      fill:"none",stroke:e.type==="contradicts"?"#c66a80":e.provenance?.context_only?"#4b91ba":"#98aabd",
+      "stroke-width":e.provenance?.context_only?2.7:1.7,
+      "stroke-dasharray":e.type==="depends-on"?"5 4":e.provenance?.context_only?"4 4":"none",
+      "marker-end":"url(#rnArrow)"});
+    svg.appendChild(path);
+  }
+  for(const id of visible){
+    const n=byId.get(id),p=state.positions[id];if(!p)continue;
+    const el=document.createElement("div");el.className="node";
+    el.setAttribute("role","button");el.tabIndex=0;el.dataset.node=id;
+    if(n.kind==="question")el.classList.add("question-node");
+    if(n.kind==="answer")el.classList.add("answer-node");
+    if(n.kind==="criterion")el.classList.add("criterion-node");
+    el.setAttribute("aria-label",n.type+" "+n.entity_id+" "+n.label);
+    el.style.transform="translate("+p.x+"px,"+p.y+"px)";
+    el.style.borderLeftColor=nodeColor(n);
+    const st=n.statuses||{};
+    if(st.lifecycle_status&&st.lifecycle_status!=="active")el.classList.add(st.lifecycle_status);
+    if(st.impact_status&&st.impact_status!=="current")el.classList.add(st.impact_status);
+    if(state.selected===id)el.classList.add("selected");
+    for(const [cls,content] of [["type",n.type+" · "+n.entity_id],["heading",n.label],["foot",[st.lifecycle_status,st.impact_status].filter(Boolean).join(" / ")||"参考记录"]]){
+      const child=document.createElement("div");child.className=cls;child.textContent=safeText(content);el.appendChild(child);
+    }
+    for(const direction of ["in","out"]){
+      const supported=n.ports?.[direction==="in"?"inputs":"outputs"]||[];
+      if(!supported.length)continue;
+      const socket=document.createElement("span");
+      socket.className="socket "+direction;
+      socket.tabIndex=0;socket.setAttribute("role","button");
+      socket.setAttribute("aria-label",(direction==="out"?"连接输出端口 ":"连接输入端口 ")+n.label);
+      socket.title=direction==="out"?"输出："+supported.join(", "):"输入："+supported.join(", ");
+      socket.dataset[direction==="out"?"outputNode":"inputNode"]=id;
+      socket.addEventListener("pointerdown",ev=>{
+        ev.preventDefault();ev.stopPropagation();
+        if(direction==="out"){wireStart=id;wireDragging=true;setWireInfo("已选择输出端口："+n.label+"；请连接输入端口");}
+      });
+      socket.addEventListener("click",ev=>{
+        ev.preventDefault();ev.stopPropagation();
+        if(direction==="out"){wireStart=id;setWireInfo("请选择目标节点的输入端口");}
+        else if(wireStart)finishWire(id);
+      });
+      socket.addEventListener("keydown",ev=>{
+        if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();socket.click();}
+      });
+      el.appendChild(socket);
+    }
+    el.addEventListener("pointerdown",ev=>startNodeDrag(ev,id));
+    el.addEventListener("keydown",ev=>nodeKey(ev,id));
+    el.addEventListener("click",()=>selectNode(id));
+    cards.appendChild(el);
+  }
+  $("counts").textContent=visible.length+" / "+graph.nodes.length+" 节点 · "+
+    allEdges.filter(e=>active.has(e.from)&&active.has(e.to)).length+" 条连线";
+  renderMini();
+}
+function openMobileInspector(){
+  if(window.matchMedia("(max-width:680px)").matches){
+    $("inspector").classList.add("open");
+    $("mobileInspectorToggle").setAttribute("aria-expanded","true");
+  }
+}
+function closeMobileInspector(){
+  $("inspector").classList.remove("open");
+  $("mobileInspectorToggle").setAttribute("aria-expanded","false");
+}
+function selectNode(id){
+  state.selected=id;
+  openMobileInspector();
+  render();
+  const node=byId.get(id);if(!node)return;
+  const related=allEdges.filter(e=>e.from===id||e.to===id);
+  const box=$("details");box.replaceChildren();
+  function section(title,content){
+    const h=document.createElement("h3");h.textContent=title;box.appendChild(h);
+    const pre=document.createElement("pre");pre.textContent=content;box.appendChild(pre);
+  }
+  section(node.type+" · "+node.entity_id,node.label);
+  section("状态（由所属权威记录提供）",JSON.stringify(node.statuses||{},null,2));
+  if(node.kind==="answer")section("访谈答案不等于科学验证",
+    "用户确认了对话内容，不代表独立实验或文献证明该结论。");
+  if(node.kind==="criterion")section("科学里程碑审批",
+    "只展示已有验收记录；连接证据或画连线不会自动满足验收条件。");
+  section("研究与证据信息",JSON.stringify(node.metadata||{},null,2));
+  if(node.metadata&&node.metadata.decision_history)
+    section("历史决策与归档背景（仅参考）",JSON.stringify(node.metadata.decision_history,null,2));
+  if(node.type==="ExperimentRun"&&node.metadata&&node.metadata.run)
+    section("实验运行溯源（记录不是科学验证）",JSON.stringify(node.metadata.run,null,2));
+  if(node.type==="DecisionTrace"&&node.metadata&&node.metadata.decision_trace){
+    section("决策溯源（不会还原缺失对话）",JSON.stringify(node.metadata.decision_trace,null,2));
+    section("证据边界","本节点引用的是已有事件 ID / SessionRef，不是完整对话重建；审批和结论仍需人工核验。");
+  }
+  if(node.metadata&&node.metadata.archive)
+    section("失败范围 / 不确定性 / 回收触发条件",JSON.stringify(node.metadata.archive,null,2));
+  if(node.metadata&&node.metadata.revival)
+    section("正式复审状态（非执行授权）",JSON.stringify(node.metadata.revival,null,2));
+  if(node.type==="ResearchBranch"||node.type==="Milestone")
+    section("规划资格",node.actionable?"当前允许规划，仍需核验证据":"当前不得自动纳入正向规划或标记科学验证");
+  section("相关关系",related.length?related.map(e=>e.from+" —"+e.type+"→ "+e.to+
+    " ("+e.provenance.collection+")").join("\n"):"暂无");
+  if(node.kind==="question")renderInterviewChoices(box,node);
+  renderSessions(id);
+  const stamp=document.createElement("div");stamp.className="info";
+  stamp.textContent="节点修订 "+safeText(node.revision)+" · 操作不修改研究状态";box.appendChild(stamp);
+}
+function renderInterviewChoices(container,node){
+  const data=node.metadata||{};
+  const wrap=document.createElement("div");wrap.className="interview-choices";
+  const title=document.createElement("strong");title.textContent="当前 Grilling 问题 · 自由回答草案";
+  wrap.appendChild(title);
+  const explain=document.createElement("p");explain.className="info";
+  explain.textContent="本画布只能生成可复制的回答草案。实际确认须在研究访谈会话中完成；回答不是科学证据。";
+  wrap.appendChild(explain);
+  const choices=Array.isArray(data.choices)?data.choices:[];
+  const controls=[];
+  for(const c of choices){
+    const label=document.createElement("label");
+    const input=document.createElement("input");input.type="radio";
+    input.name="rn-unified-interview-choice";input.value=c.id;
+    label.appendChild(input);
+    const text=document.createElement("span");
+    text.textContent=c.label+" — "+c.description+
+      (c.id===data.recommended_choice_id?"（建议，非自动选择）":"");
+    label.appendChild(text);wrap.appendChild(label);
+    controls.push(input);
+  }
+  const otherLabel=document.createElement("label");
+  const otherInput=document.createElement("input");otherInput.type="radio";
+  otherInput.name="rn-unified-interview-choice";otherInput.value="other";
+  otherLabel.appendChild(otherInput);
+  const otherText=document.createElement("span");
+  otherText.textContent="其他／自定义（可以提出全新的研究思路）";
+  otherLabel.appendChild(otherText);wrap.appendChild(otherLabel);
+  controls.push(otherInput);
+  const custom=document.createElement("textarea");custom.hidden=true;
+  custom.setAttribute("aria-label","Grilling 自定义答案");
+  custom.placeholder="输入你自己的答案（不局限于建议项）";wrap.appendChild(custom);
+  const extraLabel=document.createElement("label");
+  extraLabel.textContent="补充说明（可选；即使选择预设项也可填写）";
+  const extra=document.createElement("textarea");extra.setAttribute("aria-label","Grilling 补充说明");
+  extra.placeholder="理由、限制条件或其他看法";extraLabel.appendChild(extra);wrap.appendChild(extraLabel);
+  const draft=document.createElement("pre");draft.hidden=true;wrap.appendChild(draft);
+  const button=document.createElement("button");button.type="button";
+  button.textContent="生成回答草案（不会保存）";button.disabled=true;wrap.appendChild(button);
+  function refresh(){
+    const selected=controls.find(input=>input.checked);
+    custom.hidden=!(selected&&selected.value==="other");
+    button.disabled=!(selected&&(selected.value!=="other"||custom.value.trim()));
+    draft.hidden=true;
+  }
+  controls.forEach(input=>input.addEventListener("change",refresh));
+  custom.addEventListener("input",refresh);
+  extra.addEventListener("input",refresh);
+  button.onclick=()=>{
+    if(button.disabled)return;
+    const selected=controls.find(input=>input.checked);
+    const chosen=choices.find(c=>c.id===selected.value);
+    const response=selected.value==="other"?
+      "其他："+custom.value.trim():
+      "选项 "+selected.value+" — "+(chosen?.label||"");
+    draft.textContent=node.entity_id+" "+response+
+      (extra.value.trim()?"\n补充："+extra.value.trim():"")+
+      "\n请复制到 Codex/DeepSeek 访谈会话，明确确认后再保存。";
+    draft.hidden=false;
+  };
+  container.appendChild(wrap);
+}
+
+function startNodeDrag(ev,id){
+  if(ev.button!==0||ev.target.closest(".socket"))return;
+  ev.stopPropagation();
+  state.drag={kind:"node",id,startX:ev.clientX,startY:ev.clientY,
+    ox:state.positions[id].x,oy:state.positions[id].y,moved:false};
+  selectNode(id);
+}
+function nodeKey(ev,id){
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(ev.key)){
+    ev.preventDefault();
+    const d=ev.shiftKey?35:10;
+    state.positions[id].x+=(ev.key==="ArrowLeft"?-d:ev.key==="ArrowRight"?d:0);
+    state.positions[id].y+=(ev.key==="ArrowUp"?-d:ev.key==="ArrowDown"?d:0);
+    render();
+    const node=cards.querySelector('[data-node="'+id+'"]');if(node)node.focus();
+  }else if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();selectNode(id)}
+}
+viewport.addEventListener("pointerdown",ev=>{
+  if(ev.button!==0||ev.target.closest(".node")||ev.target.closest("#toolbar")||ev.target.closest("#minimap"))return;
+  state.drag={kind:"pan",startX:ev.clientX,startY:ev.clientY,
+    ox:state.camera.x,oy:state.camera.y};
+  viewport.setPointerCapture(ev.pointerId);viewport.classList.add("dragging");
+});
+window.addEventListener("pointermove",ev=>{
+  if(wireDragging&&wireStart){renderWirePreview(ev.clientX,ev.clientY);return}
+  if(!state.drag)return;
+  const d=state.drag,dx=ev.clientX-d.startX,dy=ev.clientY-d.startY;
+  if(d.kind==="pan"){
+    state.camera.x=d.ox+dx;state.camera.y=d.oy+dy;
+  }else{
+    const p=state.positions[d.id];p.x=d.ox+dx/state.camera.z;p.y=d.oy+dy/state.camera.z;
+    if(Math.abs(dx)+Math.abs(dy)>3)d.moved=true;
+  }
+  render();
+});
+function release(ev){
+  if(wireDragging&&wireStart){
+    const el=ev&&document.elementFromPoint(ev.clientX,ev.clientY);
+    const target=el&&el.closest("[data-input-node]");
+    if(target)finishWire(target.dataset.inputNode);
+    else setWireInfo("尚未连接：可单击目标输入端口完成，或按 Esc 取消");
+  }
+  wireDragging=false;
+  const preview=svg.querySelector("#rnWireDraft");
+  if(preview)preview.remove();
+  state.drag=null;viewport.classList.remove("dragging");
+}
+window.addEventListener("pointerup",release);window.addEventListener("pointercancel",release);
+function zoomAt(factor,px,py){
+  const old=state.camera.z,newZ=clamp(old*factor,.12,4.5),ratio=newZ/old;
+  state.camera.x=px-(px-state.camera.x)*ratio;
+  state.camera.y=py-(py-state.camera.y)*ratio;
+  state.camera.z=newZ;render();
+}
+viewport.addEventListener("wheel",ev=>{
+  ev.preventDefault();const r=viewport.getBoundingClientRect();
+  zoomAt(Math.exp(-ev.deltaY*.0012),ev.clientX-r.left,ev.clientY-r.top);
+},{passive:false});
+function fitAll(){
+  const ids=visibleNodes();if(!ids.length){state.camera={x:90,y:100,z:1};render();return}
+  const xs=ids.map(id=>state.positions[id].x),ys=ids.map(id=>state.positions[id].y);
+  const minx=Math.min(...xs),miny=Math.min(...ys),maxx=Math.max(...xs)+WIDTH,maxy=Math.max(...ys)+HEIGHT;
+  const rect=viewport.getBoundingClientRect();
+  const z=clamp(Math.min((rect.width-80)/Math.max(1,maxx-minx),(rect.height-120)/Math.max(1,maxy-miny)),.12,1.5);
+  state.camera={z,x:(rect.width-(maxx-minx)*z)/2-minx*z,y:(rect.height-(maxy-miny)*z)/2-miny*z};
+  render();
+}
+function focusSelected(){
+  if(!state.selected){$("notice").textContent="先选择一个研究节点";return}
+  const p=state.positions[state.selected],r=viewport.getBoundingClientRect();
+  state.camera.x=r.width/2-(p.x+WIDTH/2)*state.camera.z;
+  state.camera.y=r.height/2-(p.y+HEIGHT/2)*state.camera.z;render();
+}
+function renderMini(){
+  minimap.replaceChildren();
+  const ids=[...state.visible];if(!ids.length)return;
+  const pos=ids.map(id=>state.positions[id]);if(pos.some(p=>!p))return;
+  const minx=Math.min(...pos.map(p=>p.x)),maxx=Math.max(...pos.map(p=>p.x))+WIDTH,
+        miny=Math.min(...pos.map(p=>p.y)),maxy=Math.max(...pos.map(p=>p.y))+HEIGHT;
+  const zoom=Math.min(165/Math.max(1,maxx-minx),115/Math.max(1,maxy-miny));
+  for(const id of ids){
+    const p=state.positions[id],n=byId.get(id);
+    minimap.appendChild(makeSvg("rect",{x:5+(p.x-minx)*zoom,y:5+(p.y-miny)*zoom,
+      width:Math.max(3,WIDTH*zoom),height:Math.max(3,HEIGHT*zoom),rx:2,
+      fill:nodeColor(n),opacity:id===state.selected?1:.7}));
+  }
+  const r=viewport.getBoundingClientRect(),wx=-state.camera.x/state.camera.z,
+    wy=-state.camera.y/state.camera.z;
+  minimap.appendChild(makeSvg("rect",{x:5+(wx-minx)*zoom,y:5+(wy-miny)*zoom,
+    width:r.width/state.camera.z*zoom,height:r.height/state.camera.z*zoom,
+    fill:"none",stroke:"#132d46","stroke-width":1.3,"stroke-dasharray":"3 2"}));
+  minimap.onclick=ev=>{
+    const p=minimap.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;
+    const transform=minimap.getScreenCTM();if(!transform)return;
+    const local=p.matrixTransform(transform.inverse());
+    const x=(local.x-5)/zoom+minx,y=(local.y-5)/zoom+miny;
+    state.camera.x=r.width/2-x*state.camera.z;
+    state.camera.y=r.height/2-y*state.camera.z;render();
+  };
+}
+const fragmentToken=decodeURIComponent(location.hash.replace(/^#token=/,""));
+let liveToken=fragmentToken;
+if(location.protocol==="http:"&&location.hostname==="127.0.0.1"){
+  try{
+    if(fragmentToken)sessionStorage.setItem("rn_canvas_local_capability",fragmentToken);
+    else liveToken=sessionStorage.getItem("rn_canvas_local_capability")||"";
+  }catch(e){ /* sessionStorage may be blocked: user can reopen launch URL */ }
+  if(fragmentToken)history.replaceState(null,"",location.pathname);
+}
+let liveReady=false,previewed=null,pendingProposal=null;
+populateContextEdges();
+function semanticPayload(){
+  return {operation:$("semanticOperation").value,
+    params:JSON.parse($("semanticParams").value),
+    reason:$("semanticReason").value,
+    expected_revision:graph.project_revision};
+}
+function exampleParams(op){
+  const selected=state.selected?byId.get(state.selected):null;
+  const id=selected?selected.entity_id:"IDEA-0001";
+  const examples={
+    "add-item":{type:"Idea",title:"New research candidate",module:"topic",description:"Initial unverified hypothesis"},
+    "add-branch":{title:"Research route A",goal:"Evaluate a reproducible research alternative",
+                  stop_conditions:["No repeatable improvement under fair baseline"],module:"topic"},
+    "add-milestone":{title:"Validate experimental feasibility",
+                     criteria:["Baseline is reproducible","Result artifacts are documented"],
+                     module:"experiment"},
+    "add-relation":{source:id,target:"BR-0001",relation:"member-of"},
+    "unlink-relation":{source:id,target:"BR-0001",relation:"member-of"},
+    "revise-criterion":{milestone_id:id,criterion_id:"C-001",
+                        text:"Revised scientific acceptance condition"},
+    "attach-milestone-evidence":{milestone_id:id,criterion_id:"C-001",
+                                 evidence_id:"RES-0001"},
+    "link-evidence":{claim_id:id,evidence_id:"SRC-0001",stance:"qualifies",
+                     quality:"unverified",scope:"Limited to the cited research conditions",
+                     locator:"Abstract",note:"Source must be independently verified"},
+    "set-status":{item_id:id,field:"workflow_status",value:"in-progress"},
+    "archive-route":{item_id:id,lifecycle:"parked",failure_category:"evaluation",
+      failure_scope:"Only a weak negative synthetic evaluation",revival_triggers:"New reproducible observations",
+      confidence:"uncertain",lesson:"Do not generalize a single negative result"},
+    "begin-revival-review":{item_id:id,question:"Which old assumption changed?",
+      new_conditions:"New data or evaluation constraints"},
+    "approve-revival-candidate":{item_id:id,title:"Derived hypothesis to test",
+      new_conditions:"New independent experiment or dataset",
+      approval_note:"Second separate approval after reviewing old failures"},
+    "reject-revival-review":{item_id:id,decision_note:"No sufficiently changed conditions"},
+    "register-session":{provider:"codex",workspace_id:"research-project",session_id:"actual-session-id",url:""},
+    "link-session":{session_ref_id:"SESS-0001",entity_id:id,role:"discussion"},
+    "unlink-session":{session_ref_id:"SESS-0001",entity_id:id},
+    "link-context":{from:"question:INTERVIEW-UUID-Q-0001",to:"item:HYP-0001",
+      relation:"addresses",expected_context_revision:graph.context_revision||0},
+    "unlink-context":{link_id:"context:000000000000000000000000",
+      expected_context_revision:graph.context_revision||0}
+  };
+  if(op==="approve-revival-candidate"&&selected&&selected.type==="ResearchBranch"){
+    examples[op].goal="Re-evaluate the route under independently changed conditions";
+    examples[op].stop_conditions=["Stop if the new independent baseline is not reproducible"];
+  }
+  return examples[op];
+}
+function updateEditorExample(){
+  $("semanticParams").value=JSON.stringify(exampleParams($("semanticOperation").value),null,2);
+  invalidatePreview();
+}
+function invalidatePreview(){
+  previewed=null;$("queueSemantic").disabled=true;
+  $("semanticState").textContent="未通过预览，尚无任何科研写入";
+}
+function showOffline(){
+  liveReady=false;$("editMode").textContent="离线只读；可导出草案 JSON。启动 local_editor.py serve 后通过 Bridge 打开画布才能提交提案。";
+  $("previewSemantic").disabled=true;$("queueSemantic").disabled=true;
+  $("refreshSemantic").disabled=true;
+}
+async function bridge(path,method="GET",data){
+  if(!liveToken)throw Error("当前不处于安全本机编辑会话");
+  const opts={method,cache:"no-store",headers:{"X-RN-Token":liveToken}};
+  if(data!==undefined){opts.headers["Content-Type"]="application/json";opts.body=JSON.stringify(data)}
+  const response=await fetch(path,opts);
+  const body=await response.json();
+  if(!response.ok)throw Error(body.error||"Bridge HTTP "+response.status);
+  return body;
+}
+async function connectLive(){
+  try{
+    const fresh=await bridge("/api/unified-graph");
+    if(!fresh||!fresh.project_id)throw Error("missing project graph");
+    const changedProject=graph.project_id&&graph.project_id!==fresh.project_id;
+    if(changedProject)throw Error("Project ID changed unexpectedly");
+    graph=fresh;byId=new Map(graph.nodes.map(n=>[n.id,n]));allEdges=graph.edges;
+    snapshotKey="rn-unified:"+graph.project_id+":views";
+    liveReady=true;
+    chooseStartup();
+    renderSessions(state.selected);
+    $("editMode").textContent="本机受控提案模式 · 状态修订 "+graph.project_revision+
+      " · 审批必须回到本机交互终端";
+    $("previewSemantic").disabled=false;$("refreshSemantic").disabled=false;
+    $("projectName").textContent="项目 "+graph.project_id.slice(0,8)+
+      " · 实时修订 "+graph.project_revision+" · "+graph.nodes.length+" 节点";
+    $("semanticState").textContent="已连接受控本机 Bridge；尚无科研状态变更";
+    notice("本机只读图已同步。浏览器只可提交待审批提案。");
+  }catch(e){showOffline();$("semanticState").textContent="无法连接 Bridge："+e.message;}
+}
+function initializeFreshGraph(fresh){
+  if(fresh.project_id!==graph.project_id)throw Error("项目身份不匹配");
+  const previousRevision=graph.project_revision;
+  const previousContextRevision=graph.context_revision;
+  graph=fresh;byId=new Map(graph.nodes.map(n=>[n.id,n]));allEdges=graph.edges;
+  state.positions={...defaultPositions(),...Object.fromEntries(Object.entries(state.positions).filter(([id])=>byId.has(id)))};
+  state.hidden=new Set([...state.hidden].filter(id=>byId.has(id)));
+  if(state.selected&&!byId.has(state.selected))state.selected=null;
+  $("projectName").textContent="项目 "+graph.project_id.slice(0,8)+
+    " · 修订 "+graph.project_revision+" · "+graph.nodes.length+" 节点";
+  $("editMode").textContent="本机受控提案模式 · 状态修订 "+graph.project_revision+
+    " · 终端人工确认，不自动认可任何研究真值";
+  if(graph.project_revision!==previousRevision||graph.context_revision!==previousContextRevision)invalidatePreview();
+  render();
+  renderSessions(state.selected);
+  populateContextEdges();
+}
+async function refreshLive(){
+  if(!liveReady)return;
+  try{
+    const fresh=await bridge("/api/unified-graph");
+    initializeFreshGraph(fresh);
+    if(pendingProposal){
+      const row=await bridge("/api/proposals/"+pendingProposal);
+      $("semanticState").textContent="提案 "+pendingProposal+" 状态："+row.status+
+        " · 当前科研修订 "+row.current_revision;
+      if(row.status!=="pending")pendingProposal=null;
+    }else{
+      $("semanticState").textContent="科研图已刷新至修订 "+graph.project_revision;
+    }
+  }catch(e){$("semanticState").textContent="刷新失败："+e.message}
+}
+async function previewSemantic(){
+  try{
+    if(!liveReady)throw Error("离线模式只能导出草案");
+    const payload=semanticPayload();
+    const report=await bridge("/api/preview","POST",payload);
+    $("semanticDiff").textContent=JSON.stringify(report,null,2);
+    previewed=JSON.stringify(payload);
+    $("queueSemantic").disabled=false;
+    $("semanticState").textContent="已完成模拟预览（未保存、未批准）";
+  }catch(e){invalidatePreview();$("semanticDiff").textContent="预览拒绝："+e.message}
+}
+async function queueSemantic(){
+  try{
+    if(!liveReady||!previewed)throw Error("请先预览");
+    const payload=semanticPayload();
+    if(JSON.stringify(payload)!==previewed)throw Error("参数或修订已改变，请重新预览");
+    const result=await bridge("/api/proposals","POST",payload);
+    pendingProposal=result.proposal_id;
+    $("semanticState").textContent="待终端审批："+pendingProposal+"（科研状态尚未更改）";
+    $("semanticDiff").textContent+="\n\n提案已入队，必须在本机终端运行：\n"+
+      "python scripts/local_editor.py inspect PROJECT_ROOT "+pendingProposal+
+      "\npython scripts/local_editor.py approve PROJECT_ROOT "+pendingProposal;
+    invalidatePreview();
+    $("semanticState").textContent="待终端审批："+pendingProposal+"（科研状态尚未更改）";
+  }catch(e){invalidatePreview();$("semanticState").textContent="提案提交失败："+e.message}
+}
+function verifiedSessionUrl(ref){
+  const meta=ref.metadata||{};
+  if(!ref.statuses||ref.statuses.url_verified!==true)return null;
+  try{
+    const u=new URL(meta.url||"");
+    return u.protocol==="https:"&&!u.username&&!u.password&&!u.search&&!u.hash?u.href:null;
+  }catch{return null}
+}
+function renderSessions(selectedId){
+  const container=$("sessionRecords");if(!container)return;container.replaceChildren();
+  const provider=$("sessionProviderFilter").value;
+  const workspace=$("sessionWorkspaceFilter").value.toLocaleLowerCase().trim();
+  const sessions=graph.nodes.filter(n=>n.kind==="session-ref"&&
+    (!provider||n.metadata.provider===provider)&&
+    (!workspace||(n.metadata.workspace_id||"").toLocaleLowerCase().includes(workspace))&&
+    (!selectedId||n.id===selectedId||allEdges.some(e=>
+      (e.provenance.collection==="session_refs"||e.type==="discussed-in-session")&&
+      e.from===n.id&&e.to===selectedId)));
+  if(!sessions.length){
+    container.textContent="无匹配会话。可调整过滤或在右侧添加 SessionRef 提案。";return;
+  }
+  sessions.forEach(ref=>{
+    const m=ref.metadata||{},box=document.createElement("div");
+    box.className="warn info";box.style.margin="8px 0";
+    const roles=allEdges.filter(e=>e.from===ref.id&&e.to===selectedId&&
+      (e.provenance.collection==="session_refs"||e.type==="discussed-in-session"))
+      .map(e=>e.type.replace(/^session:/,""));
+    const title=document.createElement("strong");
+    title.textContent=ref.entity_id+" · "+m.provider+" · "+(roles.join(", ")||"registered");
+    box.appendChild(title);
+    for(const content of ["Workspace: "+(m.workspace_id||"unknown"),
+       "Session ID: "+(m.session_id||"unknown"),
+       "Recorded: "+(m.recorded_by||"unknown")+" @ "+(m.recorded_at||"unknown")]){
+      const line=document.createElement("div");line.textContent=content;box.appendChild(line);
+    }
+    const copy=document.createElement("button");copy.textContent="复制 Session ID";
+    copy.onclick=async()=>{try{
+      await navigator.clipboard.writeText(m.session_id||"");notice("已复制会话 ID");
+    }catch{notice("剪贴板不可用，请手动复制上方 Session ID")}};
+    box.appendChild(copy);
+    const target=verifiedSessionUrl(ref);
+    if(target){
+      const go=document.createElement("button");go.textContent="打开已验证会话";
+      go.onclick=()=>window.open(target,"_blank","noopener,noreferrer");box.appendChild(go);
+    }else{
+      const warn=document.createElement("div");warn.textContent="未验证的 provider 深链接；禁止自动跳转";
+      box.appendChild(warn);
+    }
+    container.appendChild(box);
+  });
+}
+function initSemantic(){
+  $("semanticOperation").onchange=updateEditorExample;
+  $("useSelected").onclick=updateEditorExample;
+  $("semanticParams").addEventListener("input",invalidatePreview);
+  $("semanticReason").addEventListener("input",invalidatePreview);
+  $("previewSemantic").onclick=previewSemantic;
+  $("queueSemantic").onclick=queueSemantic;
+  $("refreshSemantic").onclick=refreshLive;
+  $("exportSemantic").onclick=()=>{
+    try{
+      const payload=semanticPayload();
+      exportText("research-proposal-draft.json",JSON.stringify(payload,null,2),"application/json");
+      $("semanticState").textContent="草案已导出；未进入审批队列，未更改科研状态";
+    }catch(e){$("semanticState").textContent="导出失败："+e.message}
+  };
+  $("sessionProviderFilter").addEventListener("change",()=>renderSessions(state.selected));
+  $("sessionWorkspaceFilter").addEventListener("input",()=>renderSessions(state.selected));
+  $("prepareUnlinkContext").onclick=()=>{
+    const id=$("contextLinks").value;
+    if(!id){notice("先选择上下文连线");return}
+    $("semanticOperation").value="unlink-context";
+    $("semanticParams").value=JSON.stringify({link_id:id,
+      expected_context_revision:graph.context_revision||0},null,2);
+    $("semanticReason").value="Remove stale research context reference after user review";
+    invalidatePreview();
+    notice("已创建撤销草案；仍需要预览及本机终端人工审批");
+  };
+  updateEditorExample();
+  populateContextEdges();
+}
+
+function setWireInfo(value){
+  const e=$("wireState");if(e)e.textContent=value;
+}
+function renderWirePreview(clientX,clientY){
+  if(!wireStart||!state.positions[wireStart])return;
+  const p=state.positions[wireStart],rect=viewport.getBoundingClientRect(),cam=state.camera;
+  const x=(clientX-rect.left-cam.x)/cam.z,y=(clientY-rect.top-cam.y)/cam.z;
+  const x1=p.x+WIDTH,y1=p.y+HEIGHT/2,bend=Math.max(55,Math.abs(x-x1)*0.43);
+  let path=svg.querySelector("#rnWireDraft");
+  if(!path){path=makeSvg("path",{id:"rnWireDraft",fill:"none",stroke:"#e59e40",
+      "stroke-width":3,"stroke-dasharray":"4 4"});svg.appendChild(path)}
+  path.setAttribute("d","M "+x1+" "+y1+" C "+(x1+bend)+" "+y1+" "+(x-bend)+" "+y+" "+x+" "+y);
+}
+function connectionDraft(source,target){
+  const a=byId.get(source),b=byId.get(target);
+  if(!a||!b||source===target)throw Error("连接必须包含两个不同的有效节点");
+  if(a.kind==="item"&&b.kind==="item"){
+    const rel=b.type==="ResearchBranch"?"member-of":b.type==="Milestone"?
+      "contributes-to":"depends-on";
+    return {operation:"add-relation",params:{source:a.entity_id,target:b.entity_id,relation:rel}};
+  }
+  const from=a.id.split(":")[0],to=b.id.split(":")[0];
+  const rules={
+    "question:item":"addresses","answer:item":"motivates",
+    "session:interview":"discussed-in-session","session:question":"discussed-in-session",
+    "session:answer":"discussed-in-session",
+    "source:criterion":"context-for","evidence:criterion":"context-for",
+    "item:criterion":(["Claim","Result","ExperimentRun","Hypothesis"].includes(a.type)?"informs":"context-for"),
+    "question:item-route":"references-route"
+  };
+  const key=from+":"+to;
+  const rel=rules[key];
+  if(!rel)throw Error("端口类型不兼容；只允许受控的跨领域连接");
+  return {operation:"link-context",
+    params:{from:source,to:target,relation:rel,
+            expected_context_revision:graph.context_revision||0}};
+}
+function finishWire(target){
+  const source=wireStart;wireStart=null;wireDragging=false;
+  const preview=svg.querySelector("#rnWireDraft");if(preview)preview.remove();
+  if(!source)return;
+  try{
+    const draft=connectionDraft(source,target);
+    $("semanticOperation").value=draft.operation;
+    $("semanticParams").value=JSON.stringify(draft.params,null,2);
+    $("semanticReason").value="Review user-proposed research context link, no scientific truth automatically inferred";
+    invalidatePreview();
+    const warning="草案 "+source+" → "+target+
+      " 已填写；提交前预览影响并由本机终端审批。";
+    setWireInfo(warning);
+    selectNode(target);
+    if(!liveReady)$("semanticState").textContent="离线仅可导出草案；连线未保存";
+  }catch(e){setWireInfo("连接失败："+e.message);notice("连接被拒绝："+e.message)}
+}
+function populateContextEdges(){
+  const select=$("contextLinks");
+  if(!select)return;
+  const previous=select.value;select.replaceChildren();
+  const head=document.createElement("option");head.value="";
+  head.textContent="选择上下文边";select.appendChild(head);
+  for(const e of allEdges.filter(e=>e.provenance?.context_only)){
+    const option=document.createElement("option");
+    option.value=e.id;option.textContent=e.type+": "+e.from+" → "+e.to;
+    select.appendChild(option);
+  }
+  if([...select.options].some(x=>x.value===previous))select.value=previous;
+}
+window.addEventListener("keydown",ev=>{
+  if(ev.key==="Escape"&&wireStart){wireStart=null;wireDragging=false;
+    const preview=svg.querySelector("#rnWireDraft");
+    if(preview)preview.remove();setWireInfo("已取消连线");}
+});
+
+function exportText(name,data,type){
+  const blob=new Blob([data],{type}),url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+function notice(message){$("notice").textContent=message}
+function saveLayout(){
+  const name=$("viewName").value.trim()||"default",all=readSaved();
+  all[name]=currentLayout(name);
+  const ok=writeSaved(all);
+  notice(ok?"布局已保存在此浏览器（不修改科研数据）；也可导出 JSON。":"浏览器存储不可用，请导出布局 JSON。");
+}
+function loadLayout(){
+  const name=$("viewName").value.trim()||"default";
+  const all=readSaved();
+  const target=all[name]||(initialViews.views||{})[name];
+  if(!target){notice("未找到布局 "+name);return}
+  try{applyLayout(target);notice("已恢复布局 "+name)}catch(e){notice("布局导入失败："+e.message)}
+}
+function exportLayout(){
+  const name=$("viewName").value.trim()||"default";
+  exportText("research-layout-"+name+".json",JSON.stringify(currentLayout(name),null,2),"application/json");
+}
+function importLayout(file){
+  if(!file)return;
+  if(file.size>2e6){notice("布局文件超过 2 MB，拒绝导入");return}
+  file.text().then(text=>{
+    const imported=JSON.parse(text);applyLayout(imported);
+    notice("已导入布局（仅视图）；点击保存可记入当前浏览器");
+  }).catch(e=>notice("导入失败："+e.message));
+}
+function exportSvg(){
+  const ids=[...state.visible];if(!ids.length)return;
+  const positions=ids.map(id=>state.positions[id]);
+  const minx=Math.min(...positions.map(p=>p.x))-25,miny=Math.min(...positions.map(p=>p.y))-25;
+  const maxx=Math.max(...positions.map(p=>p.x))+WIDTH+25,maxy=Math.max(...positions.map(p=>p.y))+HEIGHT+25;
+  const out=makeSvg("svg",{xmlns:NS,viewBox:[minx,miny,maxx-minx,maxy-miny].join(" "),
+    width:maxx-minx,height:maxy-miny});
+  out.appendChild(makeSvg("rect",{x:minx,y:miny,width:maxx-minx,height:maxy-miny,fill:"#f4f7fb"}));
+  for(const e of allEdges){
+    if(!state.visible.has(e.from)||!state.visible.has(e.to))continue;
+    const a=state.positions[e.from],b=state.positions[e.to];
+    out.appendChild(makeSvg("line",{x1:a.x+WIDTH/2,y1:a.y+HEIGHT/2,
+      x2:b.x+WIDTH/2,y2:b.y+HEIGHT/2,stroke:"#98aabd","stroke-width":2}));
+  }
+  for(const id of ids){
+    const p=state.positions[id],n=byId.get(id);
+    out.appendChild(makeSvg("rect",{x:p.x,y:p.y,width:WIDTH,height:HEIGHT,rx:10,
+      fill:"#fff",stroke:nodeColor(n),"stroke-width":2}));
+    const title=makeSvg("text",{x:p.x+10,y:p.y+24,fill:"#25435b","font-size":11});
+    title.textContent=n.type+" · "+n.entity_id;out.appendChild(title);
+    const label=makeSvg("text",{x:p.x+10,y:p.y+45,fill:"#16283e","font-size":12});
+    label.textContent=n.label.length>23?n.label.slice(0,22)+"…":n.label;out.appendChild(label);
+  }
+  const title=makeSvg("title",{});title.textContent="Research Canvas read-only, project revision "+graph.project_revision;
+  out.insertBefore(title,out.firstChild);
+  exportText("research-canvas-revision-"+graph.project_revision+".svg",
+    new XMLSerializer().serializeToString(out),"image/svg+xml");
+}
+for(const button of ["view","module","lifecycle"])$(button).addEventListener("change",()=>{render();fitAll()});
+$("search").addEventListener("input",render);
+$("zoomIn").onclick=()=>zoomAt(1.2,viewport.clientWidth/2,viewport.clientHeight/2);
+$("zoomOut").onclick=()=>zoomAt(1/1.2,viewport.clientWidth/2,viewport.clientHeight/2);
+$("fit").onclick=fitAll;$("focus").onclick=focusSelected;
+$("mobileInspectorToggle").onclick=()=>{
+  if($("inspector").classList.contains("open"))closeMobileInspector();
+  else openMobileInspector();
+};
+$("closeMobileInspector").onclick=closeMobileInspector;
+$("unselect").onclick=()=>{state.selected=null;$("details").textContent="请选择一个节点";render();renderSessions(null)};
+$("collapse").onclick=()=>{
+  if(!state.selected){notice("先选择节点，再折叠或展开直接邻居");return}
+  const neighbors=new Set();
+  allEdges.forEach(e=>{
+    if(e.from===state.selected)neighbors.add(e.to);
+    if(e.to===state.selected)neighbors.add(e.from);
+  });
+  const hide=[...neighbors].some(id=>!state.hidden.has(id));
+  neighbors.forEach(id=>{if(hide)state.hidden.add(id);else state.hidden.delete(id)});
+  render();
+};
+$("saveLayout").onclick=saveLayout;$("loadLayout").onclick=loadLayout;
+$("exportLayout").onclick=exportLayout;$("importLayout").onclick=()=>$("fileInput").click();
+$("fileInput").onchange=ev=>importLayout(ev.target.files[0]);
+$("resetLayout").onclick=()=>{const defaults=defaultPositions();for(const node of graph.nodes){if(state.pinnedGroups.has(node.module||"session")&&state.positions[node.id])defaults[node.id]=state.positions[node.id]}state.positions=defaults;state.hidden.clear();fitAll();notice("已重新布局，固定的模块组位置保留（尚未保存）")};
+$("pinGroup").onclick=()=>{
+  if(!state.selected){notice("先选择一个研究节点或路线");return}
+  const selected=byId.get(state.selected);
+  const group=selected.type==="ResearchBranch"?"branch:"+selected.id:
+    (selected.module||"session");
+  if(state.pinnedGroups.has(group)){state.pinnedGroups.delete(group);notice("已解除分组："+group)}
+  else{state.pinnedGroups.add(group);notice("已固定分组："+group)}
+  render();
+};
+$("exportSVG").onclick=exportSvg;
+viewport.addEventListener("keydown",ev=>{
+  if(ev.target!==viewport)return;
+  if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(ev.key)){
+    ev.preventDefault();const d=ev.shiftKey?80:35;
+    state.camera.x+=ev.key==="ArrowLeft"?d:ev.key==="ArrowRight"?-d:0;
+    state.camera.y+=ev.key==="ArrowUp"?d:ev.key==="ArrowDown"?-d:0;render();
+  }
+  if(ev.key==="+"||ev.key==="="){ev.preventDefault();zoomAt(1.15,viewport.clientWidth/2,viewport.clientHeight/2)}
+  if(ev.key==="-"){ev.preventDefault();zoomAt(1/1.15,viewport.clientWidth/2,viewport.clientHeight/2)}
+});
+["topic","literature","experiment","pivot","synthesis"].forEach(mod=>{
+  const o=document.createElement("option");o.value=mod;o.textContent=mod;$("module").appendChild(o);
+});
+$("projectName").textContent="项目 "+graph.project_id.slice(0,8)+" · 修订 "+graph.project_revision+" · "+graph.nodes.length+" 节点";
+notice("科研布局与状态分离 · 移动节点不修改权威研究记录");
+initSemantic();
+if(liveToken){connectLive()}else{chooseStartup();showOffline()}
+
+})();
+</script>
+</body></html>

@@ -17,7 +17,8 @@ from rn_core import (ResearchError, add_item, add_relation, change_status, load,
 from rn_canvas_semantics import (CANVAS_OPERATIONS, SAFE_RELATIONS, validate_extra,
                                  apply_to_state, preview_from_state)
 
-PROPOSAL_OPERATIONS = CANVAS_OPERATIONS
+CONTEXT_OPERATIONS = ("link-context", "unlink-context")
+PROPOSAL_OPERATIONS = CANVAS_OPERATIONS + CONTEXT_OPERATIONS
 PUBLIC_ITEM_TYPES = ("Idea", "Hypothesis", "Task", "ResearchQuestion", "Claim", "Risk",
                      "Concept", "ExperimentPath", "Experiment", "Decision")
 MAX_FIELDS = 14
@@ -89,6 +90,20 @@ def validate_proposal(root, payload):
             "to-be-determined", "ready-for-agent", "to-be-implemented", "in-progress"
         ):
             raise ResearchError("blocking, completion and retirement require main Agent workflow")
+    elif op == "link-context":
+        if set(args) != {"from","to","relation","expected_context_revision"}:
+            raise ResearchError("Context link requires exact source, target, relation and context revision")
+        from unified_graph import validate_link_fields
+        validate_link_fields(args["from"], args["to"], args["relation"])
+        if type(args["expected_context_revision"]) is not int or args["expected_context_revision"]<0:
+            raise ResearchError("Invalid context revision")
+    elif op == "unlink-context":
+        if set(args) != {"link_id","expected_context_revision"}:
+            raise ResearchError("Context unlink requires exact edge and context revision")
+        if not isinstance(args["link_id"],str) or not re.fullmatch(r"context:[0-9a-f]{24}",args["link_id"]):
+            raise ResearchError("Invalid context link ID")
+        if type(args["expected_context_revision"]) is not int or args["expected_context_revision"]<0:
+            raise ResearchError("Invalid context revision")
     else:
         validate_extra(op, args)
     return {"operation": op, "params": args, "reason": reason.strip(), "expected_revision": rev}
@@ -105,7 +120,10 @@ def queue_proposal(root, payload):
             raise ResearchError("stale proposal; refresh state and retry")
         # Reject structurally invalid or unauthorized semantic changes before
         # placing the proposal in the queue; no canonical files are modified.
-        preview_from_state(state, proposal)
+        if proposal["operation"] in CONTEXT_OPERATIONS:
+            _preview_context(root,proposal)
+        else:
+            preview_from_state(state, proposal)
         pid = secrets.token_hex(16)
         proposal.update({"id": pid, "created_at": now(),
                          "project_id": state["project"]["project_id"],
@@ -166,6 +184,17 @@ def approve_proposal(root, proposal_id, *, confirmed=False):
         live = read_json(path)
         if live.get("status") != "pending":
             raise ResearchError("proposal already processed")
+        if p["operation"] in CONTEXT_OPERATIONS:
+            from unified_graph import commit_context_proposal
+            result=commit_context_proposal(root,clean,proposal_id=proposal_id)
+            live["status"]="applied"
+            live["applied_at"]=now()
+            live["result"]=result
+            from rn_core import atomic_json
+            atomic_json(path,live)
+            return {"status":"applied","result":result,
+                    "revision":state["project"]["revision"],
+                    "context_only":True}
         # Simulate the exact approved change on a private copy; the canonical
         # write occurs exactly once and preserves the event-based audit trail.
         import copy
@@ -186,12 +215,26 @@ def approve_proposal(root, proposal_id, *, confirmed=False):
 
 
 
+def _preview_context(root, clean):
+    from unified_graph import (inspect_context_candidate,inspect_unlink_candidate,
+                               read_context)
+    params=clean["params"]
+    if read_context(root)["revision"]!=params["expected_context_revision"]:
+        raise ResearchError("stale context revision; refresh before submitting")
+    if clean["operation"]=="link-context":
+        return inspect_context_candidate(root,params["from"],params["to"],
+                                         params["relation"],clean["expected_revision"])
+    return inspect_unlink_candidate(root,params["link_id"],clean["expected_revision"])
+
+
 def preview_proposal(root, payload):
     """Preview a concrete before/after/impact; never enqueue or edit state."""
     clean = validate_proposal(root, payload)
     state = load(root)
     if state["project"].get("schema_version") != "0.2.0":
         raise ResearchError("migrate project before semantic proposals")
+    if clean["operation"] in CONTEXT_OPERATIONS:
+        return _preview_context(root,clean)
     return preview_from_state(state, clean)
 
 

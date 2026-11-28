@@ -76,3 +76,8 @@ description: Use when a student, advisor, or first-time user explicitly asks how
 ## v0.5 development · DeepSeek Harness
 
 Both skills can be installed via the main source checkout's scripts/install_harness.py. Explain the difference between filesystem installation and actual runtime activation. The installed sibling research-navigator/references/harnesses/deepseek.md contains commands and limitations. In DSH use the supported explicit skill loader; do not promise automatic activation, live popup or user PC installation. Read the same project's status/next/handoff to continue a Codex interview. Native questions need a compatible live ask_user_question tool; otherwise text fallback with Other and supplement. Preserve existing help-only/read-only boundaries.
+
+
+## v0.6 统一无限画布使用帮助
+
+若用户问如何从 Grilling 访谈到证据图、研究路线及科研 Milestone 统一导航：解释新版 research/canvas/unified.html 与旧版 index.html 的区别；先在项目上运行 scripts/build_dashboard.py PROJECT_ROOT。统一画布支持节点查看、布局与连线草案；真正语义修改必须经本机 protected preview/queue/terminal approve，离线不可直接写回。用户回答确认不等于科学证据。Codex/DeepSeek 的 SessionRef 是来源元数据，不是历史聊天内容自动导入。参考主 Skill references/unified-canvas-v06.md。
