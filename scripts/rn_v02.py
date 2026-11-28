@@ -6,7 +6,7 @@ VERSION = "0.2.0"
 LEGACY = "0.1.0"
 STANCES = ("supports", "contradicts", "qualifies")
 EVIDENCE_QUALITIES = ("unverified", "source-checked", "experiment-observed")
-SESSION_PROVIDERS = ("codex", "chatgpt", "other")
+SESSION_PROVIDERS = ("codex", "chatgpt", "deepseek", "other")
 SESSION_ROLES = ("idea-origin", "discussion", "experiment-analysis", "decision", "park", "revival", "other")
 
 

@@ -217,6 +217,17 @@ class SchemaV02Tests(unittest.TestCase):
         with self.assertRaises(ResearchError):
             create_session(self.root,"codex","w","x")
 
+    def test_deepseek_session_ref(self):
+        a=add_item(self.root,kind="Idea",title="DSH fixture",module="topic")
+        s=create_session(self.root,"deepseek","workspace","session")
+        c=create_session(self.root,"codex","workspace","session")
+        session_entity_link(self.root,s["id"],a["id"],"discussion")
+        self.assertNotEqual(s["id"],c["id"])
+        self.assertFalse(s["url_verified"])
+        self.assertEqual(validate_state(load(self.root)),[])
+        with self.assertRaises(ResearchError):
+            create_session(self.root,"deepseek","workspace","session")
+
     def test_05_03_unlinked_session_does_not_change_evidence(self):
         a=add_item(self.root,kind="Idea",title="A",module="topic")
         s=create_session(self.root,"other","workspace","session")
