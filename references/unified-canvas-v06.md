@@ -1,6 +1,6 @@
 # v0.6 Unified Research Node Editor — Contract and Operator Guide
 
-Development status: feature branch only. The v0.5 Multi-Harness source has been integrated **in this feature branch**, but PR #66 has NOT been merged or released into main.
+Development status: v0.6 feature branch, not a stable release. The v0.5 Multi-Harness source is now merged to main via PR #66 (c2910548) and incorporated in this branch. Neither a stable v0.5 release nor real-client acceptance is implied.
 
 ## Authoritative stores
 
@@ -46,7 +46,7 @@ There is NO HTTP approval endpoint. A queued proposal is pending, not applied. R
 
 Interview question/answer status, typed choices, Other input, supplements and explicit exit are projected from the interview sidecar. A user confirming an interview answer does not confirm the scientific truth of the response. If native Codex UI is unavailable, normal chat questions retain Other and optional supplementary explanations; an async 'accepted' delivery acknowledgment is not an answer.
 
-SessionRef nodes show provider, workspace, session ID and verified-link status. On the v0.6 feature branch, the v0.5 provider contract adds DeepSeek alongside Codex and other existing providers. A session can reference many scientific items and a research node can reference multiple sessions. No full chat transcript is stored, and unverified links do not open automatically.
+SessionRef nodes show provider, workspace, session ID and verified-link status. The integrated v0.5 provider contract adds DeepSeek alongside Codex and other existing providers. A session can reference many scientific items and a research node can reference multiple sessions. No full chat transcript is stored, and unverified links do not open automatically.
 
 ## Layout, privacy and release gate
 

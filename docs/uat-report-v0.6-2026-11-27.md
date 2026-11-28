@@ -24,12 +24,12 @@ Each journey runs inside TemporaryDirectory; the script asserts the directory is
 ## CI evidence
 
 - Linux Python 3.10 and 3.12: 219 Python tests each; v0.4.2 seven-round Grilling UAT, six earlier scientist journeys and all three v0.6 journeys PASS.
-- Full Windows Python 3.12 runner and Chromium are required for the **final HEAD** check before closure; inspect the latest run rather than reuse earlier green commits.
+- Windows Python 3.12 and Chromium also passed at feature head 78b4421; all four jobs in https://github.com/dykuang/research-navigator/actions/runs/46031495045 succeeded. The full regression must be reconfirmed on the new integration head.
 - Workflow: https://github.com/dykuang/research-navigator/actions/workflows/validate-v06.yml
 
 ## Compatibility and manual gates
 
 - Existing v0.2 Research Canvas and classic SVG dashboard are retained as separate fallback views. New unified.html does not overwrite index.html.
-- This feature branch explicitly integrates the v0.5 Multi-Harness source at commit 5bb4be1, but v0.5 PR #66 has NOT been merged to main. Do not tag/release v0.6 before that dependency is reviewed and main integration is reconciled.
+- The v0.5 source at 5bb4be1 is already in this branch, and PR #66 merged into main at c2910548 on 2026-11-28 with an identical file tree. This branch reconciles that main commit. This satisfies the code ancestry gate, not the real-client or stable release gate.
 - Codex/DeepSeek native UI activation, provider deep links, real Windows user installation and actual scientific judgments remain manual acceptance tasks.
 - Layout and contextual references are not scientific approvals; existing human review, experimental provenance and archive/revival protections stay authoritative.
